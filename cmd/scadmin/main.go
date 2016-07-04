@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	_ "io/ioutil"
 	"net/http"
 	"runtime"
 )
@@ -45,9 +47,8 @@ func GetLastVersion(baseUrl string, transport *http.Transport) (build int, url s
 		} `json:"Sauce Connect"`
 	}{}
 
-	err = json.NewDecoder(resp.Body).Decode(&jsonStruct)
+	err = DecodeJSON(resp.Body, &jsonStruct)
 	if err != nil {
-		err = fmt.Errorf("Couldn't decode JSON document: %s", err)
 		return
 	}
 
@@ -74,6 +75,97 @@ func GetLastVersion(baseUrl string, transport *http.Transport) (build int, url s
 	return
 }
 
+type RequestConfig struct {
+	BaseURL   string
+	Username  string
+	Password  string
+	Transport *http.Transport
+}
+
+//
+// Execute HTTP request and return an io.ReadCloser to be decoded
+//
+func ExecuteRequest(req *http.Request, r *RequestConfig) (io.ReadCloser, error) {
+	req.SetBasicAuth(r.Username, r.Password)
+
+	var client = http.Client{Transport: r.Transport}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("Couldn't connect to %s: %s", req.URL, err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("Couldn't find %s: %s", req.URL, resp.Status)
+	}
+
+	return resp.Body, nil
+}
+
+//
+// This will close `reader`
+//
+func DecodeJSON(reader io.ReadCloser, v interface{}) error {
+	defer reader.Close()
+	var err = json.NewDecoder(reader).Decode(v)
+	if err != nil {
+		return fmt.Errorf("Couldn't decode JSON document: %s", err)
+	}
+
+	return nil
+}
+
+type TunnelStates []struct {
+	Id               string   `json:"id"`
+	TunnelIdentified string   `json:"tunnel_id"`
+	DomainNames      []string `json:"domain_names"`
+}
+
+func GetTunnelStates(r *RequestConfig) (states TunnelStates, err error) {
+	var url = fmt.Sprintf("%s/%s/tunnels?full=1", r.BaseURL, r.Username)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return
+	}
+
+	body, err := ExecuteRequest(req, r)
+	if err != nil {
+		return
+	}
+
+	err = DecodeJSON(body, &states)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+//
+// Return all the tunnels with the same id, tunnelId
+//
+func (self *TunnelStates) Match(tunnelId string, domains []string) TunnelStates {
+	var newStates TunnelStates
+
+	for _, state := range *self {
+		if state.TunnelIdentified == tunnelId {
+			newStates = append(newStates, state)
+			continue
+		}
+
+		for _, localDomain := range domains {
+			for _, remoteDomain := range state.DomainNames {
+				if localDomain == remoteDomain {
+					newStates = append(newStates, state)
+					continue
+				}
+			}
+		}
+	}
+
+	return newStates
+}
+
 func main() {
 	var tr = &http.Transport{}
 
@@ -83,4 +175,19 @@ func main() {
 	} else {
 		fmt.Printf("ERROR: %s\n", err)
 	}
+
+	var config = &RequestConfig{
+		BaseURL:   "https://saucelabs.com/rest/v1",
+		Username:  "henryprecheur",
+		Password:  "fd698b0a-744c-4304-b1bd-16e2734127bf",
+		Transport: tr,
+	}
+
+	info, err := GetTunnelStates(config)
+	if err == nil {
+		fmt.Printf("return: %+v\n", info)
+	} else {
+		panic(err)
+	}
+	fmt.Printf("%+v\n", info.Match("foobar", []string{"sauce-connect.proxy"}))
 }

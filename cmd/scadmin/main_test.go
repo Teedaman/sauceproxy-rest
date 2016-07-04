@@ -8,8 +8,7 @@ import (
 	"net/http/httptest"
 )
 
-const versionJson = `
-{
+const versionJson = `{
     "Sauce Connect": {
         "download_url": "https://wiki.saucelabs.com/display/DOCS/Setting+Up+Sauce+Connect", 
         "linux": {
