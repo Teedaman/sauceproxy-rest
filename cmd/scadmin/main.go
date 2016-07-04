@@ -16,12 +16,19 @@ import (
 //
 func GetLastVersion(baseUrl string, transport *http.Transport) (build int, url string, err error) {
 	var client = http.Client{Transport: transport}
+	var fullUrl = fmt.Sprintf("%s/versions.json", baseUrl)
 
-	resp, err := client.Get(fmt.Sprintf("%s/versions.json", baseUrl))
+	resp, err := client.Get(fullUrl)
 	if err != nil {
+		err = fmt.Errorf("Couldn't connect to %s: %s", fullUrl, err)
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("Couldn't find %s: %s", fullUrl, resp.Status)
+		return
+	}
 
 	var decoder = json.NewDecoder(resp.Body)
 
@@ -43,6 +50,7 @@ func GetLastVersion(baseUrl string, transport *http.Transport) (build int, url s
 
 	err = decoder.Decode(&jsonStruct)
 	if err != nil {
+		err = fmt.Errorf("Couldn't decode JSON document: %s", err)
 		return
 	}
 
