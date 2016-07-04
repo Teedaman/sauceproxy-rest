@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	_ "io/ioutil"
 	"net/http"
 	"runtime"
 )
@@ -30,8 +29,6 @@ func GetLastVersion(baseUrl string, transport *http.Transport) (build int, url s
 		return
 	}
 
-	var decoder = json.NewDecoder(resp.Body)
-
 	// Structure we use to decode the json document
 	type jsonBuild struct {
 		Build       int
@@ -48,7 +45,7 @@ func GetLastVersion(baseUrl string, transport *http.Transport) (build int, url s
 		} `json:"Sauce Connect"`
 	}{}
 
-	err = decoder.Decode(&jsonStruct)
+	err = json.NewDecoder(resp.Body).Decode(&jsonStruct)
 	if err != nil {
 		err = fmt.Errorf("Couldn't decode JSON document: %s", err)
 		return
