@@ -12,7 +12,7 @@ import (
 // Decode `reader` into the object `v`, and close `reader` after.
 //
 //
-func DecodeJSON(reader io.ReadCloser, v interface{}) error {
+func decodeJSON(reader io.ReadCloser, v interface{}) error {
 	defer reader.Close()
 	var err = json.NewDecoder(reader).Decode(v)
 	if err != nil {
@@ -44,7 +44,7 @@ func GetLastVersion(baseUrl string, transport *http.Transport) (build int, url s
 		return
 	}
 
-	// Structure we use to decode the json document
+	// Structures we use to decode the json document
 	type jsonBuild struct {
 		Build       int
 		DownloadUrl string `json:"download_url"`
@@ -60,7 +60,7 @@ func GetLastVersion(baseUrl string, transport *http.Transport) (build int, url s
 		} `json:"Sauce Connect"`
 	}{}
 
-	err = DecodeJSON(resp.Body, &jsonStruct)
+	err = decodeJSON(resp.Body, &jsonStruct)
 	if err != nil {
 		return
 	}
@@ -88,6 +88,9 @@ func GetLastVersion(baseUrl string, transport *http.Transport) (build int, url s
 	return
 }
 
+//
+// Used to connect the SauceLabs REST API
+//
 type RequestConfig struct {
 	BaseURL   string
 	Username  string
@@ -98,7 +101,7 @@ type RequestConfig struct {
 //
 // Execute HTTP request and return an io.ReadCloser to be decoded
 //
-func ExecuteRequest(req *http.Request, r *RequestConfig) (io.ReadCloser, error) {
+func executeRequest(req *http.Request, r *RequestConfig) (io.ReadCloser, error) {
 	req.SetBasicAuth(r.Username, r.Password)
 
 	var client = http.Client{Transport: r.Transport}
@@ -128,12 +131,12 @@ func GetTunnelStates(r *RequestConfig) (states TunnelStates, err error) {
 		return
 	}
 
-	body, err := ExecuteRequest(req, r)
+	body, err := executeRequest(req, r)
 	if err != nil {
 		return
 	}
 
-	err = DecodeJSON(body, &states)
+	err = decodeJSON(body, &states)
 	if err != nil {
 		return
 	}
@@ -145,7 +148,7 @@ func GetTunnelStates(r *RequestConfig) (states TunnelStates, err error) {
 // Return all the tunnels with the same id, tunnelId
 //
 func (self *TunnelStates) Match(tunnelId string, domains []string) TunnelStates {
-	var newStates TunnelStates
+	var newStates = TunnelStates{}
 
 	for _, state := range *self {
 		if state.TunnelIdentified == tunnelId {
