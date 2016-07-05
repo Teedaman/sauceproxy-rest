@@ -170,3 +170,50 @@ func (self *TunnelStates) Match(tunnelId string, domains []string) TunnelStates 
 
 	return newStates
 }
+
+func removeTunnel(urlFmt, id string, config *RequestConfig) error {
+	var url = fmt.Sprintf(urlFmt, config.BaseURL, config.Username, id)
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = executeRequest(req, config)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// FIXME return the number of jobs running
+func RemoveTunnel(id string, config *RequestConfig) error {
+	return removeTunnel("%s/%s/tunnels/%s", id, config)
+}
+
+func RemoveTunnelForcefully(id string, config *RequestConfig) error {
+	return removeTunnel("%s/%s/tunnels/%s?wait_for_jobs=1", id, config)
+}
+
+type CreateTunnelRequest struct {
+	DomainNames      []string `json:"domain_names"`
+	TunnelIdentifier string   `json:"tunnel_identifier"`
+	Metadata struct {
+		Release	string `json:"release"`
+		GitVersion string `json:"git_version"`
+		Build string `json:"build"`
+		Platform string `json:"platform"`
+		Hostname string `json:"hostname"`
+		NoFileLimit int `json:"no_file_limit"`
+		Command string `json:"command"`
+	} `json:"metadata"`
+	SSHPort int `json:"ssh_port"`
+	NoProxyCaching   bool     `json:"no_proxy_caching"`
+	UseKGP           bool     `json:"use_kgp"`
+	FastFailRegexps  []string `json:"fast_fail_regexps"`
+	DirectDomains    []string `json:"direct_domains"`
+	SharedTunnel     bool     `json:"shared_tunnel"`
+	SquidConfig      *string  `json:"squid_config"`
+	VMVersion        string   `json:"vm_version"`
+	NoSSLBumpDomains []string `json:"no_ssl_bump_domains"`
+}

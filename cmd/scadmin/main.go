@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"github.com/henryprecheur/sauceproxy/admin"
+	"github.com/saucelabs/sauceproxy-rest/admin"
 )
 
 func main() {
@@ -30,5 +30,16 @@ func main() {
 	} else {
 		panic(err)
 	}
-	fmt.Printf("%+v\n", info.Match("foobar", []string{"sauce-connect.proxy"}))
+
+	var matches = info.Match("foobar", []string{"sauce-connect.proxy"})
+
+	fmt.Printf("%+v\n", matches)
+
+	for _, m := range matches {
+		fmt.Printf("Removing tunnel: %+v\n", m.Id)
+		err := admin.RemoveTunnel(m.Id, config)
+		if err != nil {
+			panic(err)
+		}
+	}
 }
