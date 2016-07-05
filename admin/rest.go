@@ -28,7 +28,9 @@ func decodeJSON(reader io.ReadCloser, v interface{}) error {
 // Return the newest build number for the platform as determined by
 // runtime.GOOS, and the URL to download the latest verion.
 //
-func GetLastVersion(baseUrl string, transport *http.Transport) (build int, url string, err error) {
+func GetLastVersion(baseUrl string, transport *http.Transport) (
+	build int, url string, err error,
+) {
 	var client = http.Client{Transport: transport}
 	var fullUrl = fmt.Sprintf("%s/versions.json", baseUrl)
 
