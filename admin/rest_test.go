@@ -1,40 +1,40 @@
-package main;
+package admin
 
 import (
 	"fmt"
-	"testing"
-	"strings"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"testing"
 )
 
 const versionJson = `{
     "Sauce Connect": {
-        "download_url": "https://wiki.saucelabs.com/display/DOCS/Setting+Up+Sauce+Connect", 
+        "download_url": "https://wiki.saucelabs.com/display/DOCS/Setting+Up+Sauce+Connect",
         "linux": {
-            "build": 42, 
+            "build": 42,
             "download_url": "https://saucelabs.com/downloads/sc-new",
             "sha1": "123456"
-        }, 
+        },
         "linux32": {
-            "build": 42, 
+            "build": 42,
             "download_url": "https://saucelabs.com/downloads/sc-new",
             "sha1": "123456"
-        }, 
+        },
         "osx": {
-            "build": 42, 
+            "build": 42,
             "download_url": "https://saucelabs.com/downloads/sc-new",
             "sha1": "123456"
-        }, 
-        "version": "4.3.16", 
+        },
+        "version": "4.3.16",
         "win32": {
-            "build": 42, 
+            "build": 42,
             "download_url": "https://saucelabs.com/downloads/sc-new",
             "sha1": "123456"
         }
-    }, 
+    },
     "Sauce Connect 2": {
-        "download_url": "https://docs.saucelabs.com/reference/sauce-connect/", 
+        "download_url": "https://docs.saucelabs.com/reference/sauce-connect/",
         "version": "4.3.13-r999"
     }
 }`
