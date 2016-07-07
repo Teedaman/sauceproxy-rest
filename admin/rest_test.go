@@ -54,7 +54,7 @@ func TestGetLastVersion(t *testing.T) {
 	})
 	defer server.Close()
 
-	build, url, err := GetLastVersion(server.URL, &http.Transport{})
+	build, url, err := GetLastVersion(server.URL, &http.Client{})
 
 	if err != nil {
 		t.Errorf("%v", err)
@@ -73,13 +73,13 @@ func TestGetLastVersionBadJSON(t *testing.T) {
 	})
 	defer server.Close()
 
-	_, _, err := GetLastVersion(server.URL, &http.Transport{})
+	_, _, err := GetLastVersion(server.URL, &http.Client{})
 
 	if err == nil {
 		t.Error("GetLastVersion == nil")
 	}
 
-	if !strings.HasPrefix(err.Error(), "Couldn't decode JSON document: ") {
+	if !strings.HasPrefix(err.Error(), "couldn't decode JSON document: ") {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
 }
@@ -90,13 +90,13 @@ func TestGetLastVersion404(t *testing.T) {
 	})
 	defer server.Close()
 
-	_, _, err := GetLastVersion(server.URL, &http.Transport{})
+	_, _, err := GetLastVersion(server.URL, &http.Client{})
 
 	if err == nil {
 		t.Error("GetLastVersion == nil")
 	}
 
-	if !strings.HasPrefix(err.Error(), "Couldn't find ") {
+	if !strings.HasPrefix(err.Error(), "couldn't find ") {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
 }
@@ -107,13 +107,13 @@ func TestGetLastVersionNoServer(t *testing.T) {
 	// still keep it around so our client has a 'bad' URL to connect to.
 	server.Close()
 
-	_, _, err := GetLastVersion(server.URL, &http.Transport{})
+	_, _, err := GetLastVersion(server.URL, &http.Client{})
 
 	if err == nil {
 		t.Error("GetLastVersion == nil")
 	}
 
-	if !strings.HasPrefix(err.Error(), "Couldn't connect to ") {
+	if !strings.HasPrefix(err.Error(), "couldn't connect to ") {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
 }
@@ -153,43 +153,6 @@ const tunnelsJSON = `[
   }
 ]`
 
-func TestTunnelStates(t *testing.T) {
-	var server = makeServer(func(w http.ResponseWriter) {
-		fmt.Fprintln(w, tunnelsJSON)
-	})
-	defer server.Close()
-
-	var config = RequestConfig{
-		BaseURL:   server.URL,
-		Username:  "username",
-		Password:  "password",
-		Transport: &http.Transport{},
-	}
-	states, err := GetTunnelStates(&config)
-	if err != nil {
-		t.Errorf("GetTunnelStates returned: %s", err)
-	}
-
-	var expected = TunnelStates{{
-		Id:               "fakeid",
-		TunnelIdentified: "", // FIXME is null == "" a good assumption?
-		DomainNames:      []string{"sauce-connect.proxy"},
-	}}
-	if !reflect.DeepEqual(states, expected) {
-		t.Errorf("GetTunnelStates returned: %+v\n", states)
-	}
-
-	var matches = states.Match("otherid", []string{"sauce-connect.proxy"})
-	if !reflect.DeepEqual(matches, expected) {
-		t.Errorf("states.Match returned: %+v\n", states)
-	}
-
-	var emptyMatches = states.Match("otherid", []string{"bad.domain.proxy"})
-	if !reflect.DeepEqual(emptyMatches, TunnelStates{}) {
-		t.Errorf("states.Match returned: %+v\n", emptyMatches)
-	}
-}
-
 const createJSON = `{
   "status": "new",
   "direct_domains": null,
@@ -222,3 +185,62 @@ const createJSON = `{
     "no_file_limit": 12345
   }
 }`
+
+func TestClientMatch(t *testing.T) {
+	var server = makeServer(func(w http.ResponseWriter) {
+		fmt.Fprintln(w, tunnelsJSON)
+	})
+	defer server.Close()
+
+	var client = Client{
+		BaseURL:  server.URL,
+		Username: "username",
+		Password: "password",
+	}
+
+	var matches, err = client.Match("fakeid", []string{"sauce-connect.proxy"})
+
+	if err != nil {
+		t.Errorf("client.Match errored %+v\n", err)
+	}
+
+	if !reflect.DeepEqual(matches, []string{"fakeid"}) {
+		t.Errorf("client.Match returned %+v\n", matches)
+	}
+}
+
+func TestClientShutdown(t *testing.T) {
+	var server = makeServer(func(w http.ResponseWriter) {
+		fmt.Fprintln(w, "")
+	})
+	defer server.Close()
+
+	var client = Client{
+		BaseURL:  server.URL,
+		Username: "username",
+		Password: "password",
+	}
+
+	err := client.Shutdown("fakeid")
+	if err != nil {
+		t.Errorf("client.Shutdown errored %+v\n", err)
+	}
+}
+
+func TestClientShutdown404(t *testing.T) {
+	var server = makeServer(func(w http.ResponseWriter) {
+		http.Error(w, "nothing to see here", 404)
+	})
+	defer server.Close()
+
+	var client = Client{
+		BaseURL:  server.URL,
+		Username: "username",
+		Password: "password",
+	}
+
+	err := client.Shutdown("fakeid")
+	if !strings.HasPrefix(err.Error(), "couldn't find ") {
+		t.Errorf("Invalid error: %s", err.Error())
+	}
+}

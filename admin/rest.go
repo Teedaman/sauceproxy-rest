@@ -1,14 +1,14 @@
 package admin
 
 import (
-	"bytes"
+	_ "bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	_ "io/ioutil"
 	"net/http"
 	"runtime"
-	"time"
+	_ "time"
 )
 
 //
@@ -19,7 +19,7 @@ func decodeJSON(reader io.ReadCloser, v interface{}) error {
 	var err = json.NewDecoder(reader).Decode(v)
 	reader.Close()
 	if err != nil {
-		return fmt.Errorf("Couldn't decode JSON document: %s", err)
+		return fmt.Errorf("couldn't decode JSON document: %s", err)
 	}
 
 	return nil
@@ -28,7 +28,7 @@ func decodeJSON(reader io.ReadCloser, v interface{}) error {
 func encodeJSON(w io.Writer, v interface{}) error {
 	var err = json.NewEncoder(w).Encode(v)
 	if err != nil {
-		return fmt.Errorf("Couldn't encode JSON document: %s", err)
+		return fmt.Errorf("couldn't encode JSON document: %s", err)
 	}
 
 	return nil
@@ -40,21 +40,20 @@ func encodeJSON(w io.Writer, v interface{}) error {
 // Return the newest build number for the platform as determined by
 // runtime.GOOS, and the URL to download the latest verion.
 //
-func GetLastVersion(baseUrl string, transport *http.Transport) (
+func GetLastVersion(baseUrl string, client *http.Client) (
 	build int, url string, err error,
 ) {
-	var client = http.Client{Transport: transport}
 	var fullUrl = fmt.Sprintf("%s/versions.json", baseUrl)
 
 	resp, err := client.Get(fullUrl)
 	if err != nil {
-		err = fmt.Errorf("Couldn't connect to %s: %s", fullUrl, err)
+		err = fmt.Errorf("couldn't connect to %s: %s", fullUrl, err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("Couldn't find %s: %s", fullUrl, resp.Status)
+		err = fmt.Errorf("couldn't find %s: %s", fullUrl, resp.Status)
 		return
 	}
 
@@ -112,40 +111,51 @@ type RequestConfig struct {
 	Transport *http.Transport
 }
 
+type Client struct {
+	BaseURL  string
+	Username string
+	Password string
+
+	Client http.Client
+}
+
 //
 // Execute HTTP request and return an io.ReadCloser to be decoded
 //
-func executeRequest(req *http.Request, r *RequestConfig) (io.ReadCloser, error) {
-	req.SetBasicAuth(r.Username, r.Password)
+func (c *Client) executeRequest(req *http.Request) (io.ReadCloser, error) {
+	req.SetBasicAuth(c.Username, c.Password)
 
-	var client = http.Client{Transport: r.Transport}
+	var client = c.Client
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("Couldn't connect to %s: %s", req.URL, err)
+		return nil, fmt.Errorf("couldn't connect to %s: %s", req.URL, err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		return nil, fmt.Errorf("Couldn't find %s: %s", req.URL, resp.Status)
+		return nil, fmt.Errorf("couldn't find %s: %s", req.URL, resp.Status)
 	}
 
 	return resp.Body, nil
 }
 
-type TunnelStates []struct {
+type tunnelState struct {
 	Id               string   `json:"id"`
 	TunnelIdentified string   `json:"tunnel_id"`
 	DomainNames      []string `json:"domain_names"`
 }
 
-func GetTunnelStates(r *RequestConfig) (states TunnelStates, err error) {
-	var url = fmt.Sprintf("%s/%s/tunnels?full=1", r.BaseURL, r.Username)
+//
+// Return a list of
+//
+func (c *Client) list() (states []tunnelState, err error) {
+	var url = fmt.Sprintf("%s/%s/tunnels?full=1", c.BaseURL, c.Username)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return
 	}
 
-	body, err := executeRequest(req, r)
+	body, err := c.executeRequest(req)
 	if err != nil {
 		return
 	}
@@ -159,38 +169,59 @@ func GetTunnelStates(r *RequestConfig) (states TunnelStates, err error) {
 }
 
 //
-// Return all the tunnels with the same id, tunnelId
+// Match tunnels: named tunnel with `name`, or tunnel matching one or more of
+// `domains`.
 //
-func (self *TunnelStates) Match(tunnelId string, domains []string) TunnelStates {
-	var newStates = TunnelStates{}
+func (c *Client) Match(name string, domains []string) (
+	matches []string, err error,
+) {
+	list, err := c.list()
+	if err != nil {
+		return
+	}
 
-	for _, state := range *self {
-		if state.TunnelIdentified == tunnelId {
-			newStates = append(newStates, state)
+	for _, state := range list {
+		if state.TunnelIdentified == name {
+			matches = append(matches, state.Id)
 			continue
 		}
 
 		for _, localDomain := range domains {
 			for _, remoteDomain := range state.DomainNames {
 				if localDomain == remoteDomain {
-					newStates = append(newStates, state)
+					matches = append(matches, state.Id)
 					continue
 				}
 			}
 		}
 	}
 
-	return newStates
+	return
 }
 
-func removeTunnel(urlFmt, id string, config *RequestConfig) error {
-	var url = fmt.Sprintf(urlFmt, config.BaseURL, config.Username, id)
+//
+// Shutdown tunnel `id`
+//
+func (c *Client) Shutdown(id string) error {
+	return c.shutdown("%s/%s/tunnels/%s", id)
+}
+
+func (t *Tunnel) Shutdown() error {
+	return t.Client.shutdown("%s/%s/tunnels/%s", t.Id)
+}
+
+func (t *Tunnel) ShutdownWaitForJobs() error {
+	return t.Client.shutdown("%s/%s/tunnels/%s?wait_for_jobs=1", t.Id)
+}
+
+func (c *Client) shutdown(urlFmt, id string) error {
+	var url = fmt.Sprintf(urlFmt, c.BaseURL, c.Username, id)
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
 		return err
 	}
 
-	_, err = executeRequest(req, config)
+	_, err = c.executeRequest(req)
 	if err != nil {
 		return err
 	}
@@ -198,16 +229,17 @@ func removeTunnel(urlFmt, id string, config *RequestConfig) error {
 	return nil
 }
 
-// FIXME return the number of jobs running
-func RemoveTunnel(id string, config *RequestConfig) error {
-	return removeTunnel("%s/%s/tunnels/%s", id, config)
+type Tunnel struct {
+	Client Client
+	Id     string
+
+	// A channel of error used to communicate the state of the tunnel back
+	// to the main goroutine.
+	active chan error
 }
 
-func RemoveTunnelForcefully(id string, config *RequestConfig) error {
-	return removeTunnel("%s/%s/tunnels/%s?wait_for_jobs=1", id, config)
-}
-
-type Metadata struct {
+/*
+type jsonMetadata struct {
 	Release     string `json:"release"`
 	GitVersion  string `json:"git_version"`
 	Build       string `json:"build"`
@@ -217,19 +249,54 @@ type Metadata struct {
 	Command     string `json:"command"`
 }
 
-type CreateRequest struct {
-	DomainNames      []string  `json:"domain_names"`
-	TunnelIdentifier *string   `json:"tunnel_identifier"`
-	Metadata         Metadata  `json:"metadata"`
-	SSHPort          int       `json:"ssh_port"`
-	NoProxyCaching   bool      `json:"no_proxy_caching"`
-	UseKGP           bool      `json:"use_kgp"`
-	FastFailRegexps  *[]string `json:"fast_fail_regexps"`
-	DirectDomains    *[]string `json:"direct_domains"`
-	SharedTunnel     bool      `json:"shared_tunnel"`
-	SquidConfig      *string   `json:"squid_config"`
-	VMVersion        *string   `json:"vm_version"`
-	NoSSLBumpDomains *[]string `json:"no_ssl_bump_domains"`
+type jsonRequest struct {
+	DomainNames      []string     `json:"domain_names"`
+	TunnelIdentifier *string      `json:"tunnel_identifier"`
+	Metadata         jsonMetadata `json:"metadata"`
+	SSHPort          int          `json:"ssh_port"`
+	NoProxyCaching   bool         `json:"no_proxy_caching"`
+	UseKGP           bool         `json:"use_kgp"`
+	FastFailRegexps  *[]string    `json:"fast_fail_regexps"`
+	DirectDomains    *[]string    `json:"direct_domains"`
+	SharedTunnel     bool         `json:"shared_tunnel"`
+	SquidConfig      *string      `json:"squid_config"`
+	VMVersion        *string      `json:"vm_version"`
+	NoSSLBumpDomains *[]string    `json:"no_ssl_bump_domains"`
+}
+
+//
+// Request for a new tunnel
+//
+type Request struct {
+	TunnelIdentifier string
+	DomainNames      []string
+
+	KGPPort          int
+	NoProxyCaching   bool
+	FastFailRegexps  []string
+	DirectDomains    []string
+	SharedTunnel     bool
+	VMVersion        string
+	NoSSLBumpDomains []string
+}
+
+//
+// Create a new tunnel and wait for it to come up within `timeout`.
+//
+// This will start a goroutine to keep track of the tunnel's status.
+//
+func (c *Client) Create(request *Request, timeout time.Duration) (
+	tunnel *Tunnel, err error,
+) {
+
+}
+
+// FIXME return the number of jobs running
+func RemoveTunnel(id string, config *RequestConfig) error {
+}
+
+func RemoveTunnelForcefully(id string, config *RequestConfig) error {
+	return removeTunnel("%s/%s/tunnels/%s?wait_for_jobs=1", id, config)
 }
 
 func (self *CreateRequest) Execute(config *RequestConfig) (id string, err error) {
@@ -340,20 +407,17 @@ func SendHeartBeat(
 		return err
 	}
 
-	body, err := executeRequest(req, config)
+	//
+	// The REST call return a JSON document like this:
+	//
+	//	  {"result": true, "id", "<tunnel id>"}
+	//
+	// We don't decode it since it doesn't give us any information to return
+	//
+	_, err = executeRequest(req, config)
 	if err != nil {
 		return err
 	}
-
-	var response struct {
-		Id string
-	}
-
-	err = decodeJSON(body, &response)
-	if err != nil {
-		return err
-	}
-	id = response.Id
 
 	return nil
 }
@@ -385,3 +449,46 @@ func WaitForTunnel(id string, config *RequestConfig) error {
 		"Tunnel %s didn't come up after %s",
 		id, waitTimeout.String())
 }
+
+*/
+
+/*
+func (t *Tunnel) Status() error {
+
+}
+
+func (t *Tunnel) Shutdown() error {
+
+}
+
+*/
+
+/*
+client := Client("http://...", "username", "password")
+
+overlapping, _ := client.Match("<tunnel id>", []string{"sauce-connect.proxy"})
+if args.Remove {
+	for _, tid := range overlapping {
+		_ = Client.Remove(tid)
+	}
+} else {
+	log.Printf("Overlapping tunnels: %s\n", overlapping)
+}
+
+request := Request{
+	TunnelIdentifier: "<tunnel id>",
+	DomainNames: []string{"foo.bar", "saucelabs.com"},
+}
+timeout := time.Minute
+tunnel, _ := client.Create(request, timeout)
+
+...
+
+err := tunnel.Status() // Status is checked in another goroutine
+if err != nil {
+	log.Printf("Tunnel got shut down: %s\n", err)
+	break
+}
+...
+_ := tunnel.Shutdown()
+*/
