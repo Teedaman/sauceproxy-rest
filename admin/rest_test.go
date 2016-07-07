@@ -1,10 +1,10 @@
 package admin
 
 import (
-	"reflect"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -160,9 +160,9 @@ func TestTunnelStates(t *testing.T) {
 	defer server.Close()
 
 	var config = RequestConfig{
-		BaseURL: server.URL,
-		Username: "username",
-		Password: "password",
+		BaseURL:   server.URL,
+		Username:  "username",
+		Password:  "password",
 		Transport: &http.Transport{},
 	}
 	states, err := GetTunnelStates(&config)
@@ -171,10 +171,10 @@ func TestTunnelStates(t *testing.T) {
 	}
 
 	var expected = TunnelStates{{
-			Id: "fakeid",
-			TunnelIdentified: "", // FIXME is null == "" a good assumption?
-			DomainNames: []string{"sauce-connect.proxy"},
-		}}
+		Id:               "fakeid",
+		TunnelIdentified: "", // FIXME is null == "" a good assumption?
+		DomainNames:      []string{"sauce-connect.proxy"},
+	}}
 	if !reflect.DeepEqual(states, expected) {
 		t.Errorf("GetTunnelStates returned: %+v\n", states)
 	}
@@ -189,3 +189,36 @@ func TestTunnelStates(t *testing.T) {
 		t.Errorf("states.Match returned: %+v\n", emptyMatches)
 	}
 }
+
+const createJSON = `{
+  "status": "new",
+  "direct_domains": null,
+  "vm_version": null,
+  "last_connected": null,
+  "shutdown_time": null,
+  "ssh_port": 443,
+  "launch_time": null,
+  "user_shutdown": null,
+  "use_caching_proxy": null,
+  "creation_time": 1467839998,
+  "domain_names": [
+    "sauce-connect.proxy"
+  ],
+  "shared_tunnel": false,
+  "tunnel_identifier": null,
+  "host": null,
+  "no_proxy_caching": false,
+  "owner": "henryprecheur",
+  "use_kgp": true,
+  "no_ssl_bump_domains": null,
+  "id": "49958ce5ec9f49c796542e0c691455a6",
+  "metadata": {
+    "hostname": "Henry's computer",
+    "git_version": "4a804fd",
+    "platform": "Plan9 bitch",
+    "command": "./sc",
+    "build": "Strong",
+    "release": "1.2.3",
+    "no_file_limit": 12345
+  }
+}`
