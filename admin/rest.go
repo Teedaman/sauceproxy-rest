@@ -333,9 +333,12 @@ func (c *Client) Create(request *Request, timeout time.Duration) (
 }
 
 //
-// Tunnel control interface.
+// Tunnel control interface. Create it by calling Client.Create(), all methods
+// are safe to call across goroutines. Tunnel.Status() is updated every XXX
+// seconds by a goroutine that queries the state of the tunnel.
 //
-// You create it by calling Client.Create()
+// We may want to switch the method Status with a direct access to the active
+// channel instead depending of how the main loop is done.
 //
 type Tunnel struct {
 	Client *Client

@@ -240,7 +240,7 @@ const createJSON = `{
   "metadata": {
     "hostname": "Henry's computer",
     "git_version": "4a804fd",
-    "platform": "Plan9 bitch",
+    "platform": "plan9",
     "command": "./sc",
     "build": "Strong",
     "release": "1.2.3",
@@ -250,9 +250,9 @@ const createJSON = `{
 
 func TestClientCreate(t *testing.T) {
 	// 1st we'll send the response to a create request
-	var buffer = bytes.NewBufferString(createJSON)
+	var serverBuffer = bytes.NewBufferString(createJSON)
 	var server = makeServer(func(w http.ResponseWriter) {
-		io.Copy(w, buffer)
+		io.Copy(w, serverBuffer)
 	})
 	defer server.Close()
 
