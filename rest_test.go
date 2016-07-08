@@ -55,7 +55,7 @@ func multiResponseServer(responses []string) *httptest.Server {
 	return makeServer(func(w http.ResponseWriter) {
 		io.WriteString(w, responses[index])
 		if index < len(responses) {
-			index += 1;
+			index += 1
 		}
 	})
 }
@@ -294,8 +294,7 @@ func TestClientCreateError(t *testing.T) {
 		t.Errorf("client.createWithTimeouts didn't error")
 	}
 
-	if !(
-		strings.HasPrefix(err.Error(), "couldn't decode JSON document: ")) {
+	if !(strings.HasPrefix(err.Error(), "couldn't decode JSON document: ")) {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
 }
@@ -318,8 +317,7 @@ func TestClientCreateWaitError(t *testing.T) {
 		t.Errorf("client.createWithTimeouts didn't error")
 	}
 
-	if !(
-		strings.HasPrefix(err.Error(), "Tunnel ") &&
+	if !(strings.HasPrefix(err.Error(), "Tunnel ") &&
 		strings.HasSuffix(err.Error(), " didn't come up after 0")) {
 		t.Errorf("Invalid error: %s", err.Error())
 	}

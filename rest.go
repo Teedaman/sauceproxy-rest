@@ -435,7 +435,7 @@ func (t *Tunnel) status() (
 
 	var s struct {
 		Status       string `json:"status"`
-		UserShutdown *bool `json:"user_shutdown"`
+		UserShutdown *bool  `json:"user_shutdown"`
 	}
 
 	if err = c.decodeJSON(body, &s); err != nil {
@@ -453,19 +453,17 @@ func (t *Tunnel) status() (
 	return
 }
 
-/*
 type heartBeat struct {
 	KGPConnected         bool `json:"kgp_is_connected"`
 	StatusChangeDuration int  `json:"kgp_seconds_since_last_status_change"`
 }
 
-func SendHeartBeat(
-	id string,
+func (t *Tunnel) sendHeartBeat(
 	connected bool,
 	duration time.Duration,
-	config *RequestConfig,
 ) error {
-	var url = fmt.Sprintf("%s/%s/tunnels/%s/connected", config.BaseURL, config.Username, id)
+	var c = t.Client
+	var url = fmt.Sprintf("%s/%s/tunnels/%s/connected", c.BaseURL, c.Username, t.Id)
 
 	var h = heartBeat{
 		KGPConnected:         connected,
@@ -486,78 +484,13 @@ func SendHeartBeat(
 	//
 	//	  {"result": true, "id", "<tunnel id>"}
 	//
-	// We don't decode it since it doesn't give us any information to return
+	// We don't decode it since it doesn't give us any useful information to
+	// return.
 	//
-	_, err = executeRequest(req, config)
+	_, err = c.executeRequest(req)
 	if err != nil {
 		return err
 	}
 
 	return nil
 }
-
-// FIXME the old sauce connect makes an HTTP query and then sleep for 1
-// second up to 60 times. This means the old Sauce Connect would wait up to: 60
-// seconds + 60 * time the HTTP roundtrip.
-//
-// This means we may have to bump this timeout value up from 1 minute.
-const waitTimeout = time.Minute
-
-func WaitForTunnel(id string, config *RequestConfig) error {
-	var timeout = time.Now().Add(waitTimeout)
-
-	for time.Now().Before(timeout) {
-		status, err := getTunnelStatus(id, config)
-		if err != nil {
-			return err
-		}
-
-		if status.Status == "running" {
-			return nil
-		} else {
-			time.Sleep(time.Second)
-		}
-	}
-
-	return fmt.Errorf(
-		"Tunnel %s didn't come up after %s",
-		id, waitTimeout.String())
-}
-
-*/
-
-/*
-func (t *Tunnel) Status() error {
-
-}
-*/
-
-/*
-client := Client("http://...", "username", "password")
-
-overlapping, _ := client.Match("<tunnel id>", []string{"sauce-connect.proxy"})
-if args.Remove {
-	for _, tid := range overlapping {
-		_ = Client.Remove(tid)
-	}
-} else {
-	log.Printf("Overlapping tunnels: %s\n", overlapping)
-}
-
-request := Request{
-	TunnelIdentifier: "<tunnel id>",
-	DomainNames: []string{"foo.bar", "saucelabs.com"},
-}
-timeout := time.Minute
-tunnel, _ := client.Create(request, timeout)
-
-...
-
-err := tunnel.Status() // Status is checked in another goroutine
-if err != nil {
-	log.Printf("Tunnel got shut down: %s\n", err)
-	break
-}
-...
-_ := tunnel.Shutdown()
-*/
