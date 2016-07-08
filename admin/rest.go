@@ -1,14 +1,17 @@
 package admin
 
 import (
-	_ "bytes"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	_ "io/ioutil"
 	"net/http"
+	"os"
 	"runtime"
-	_ "time"
+	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 //
@@ -102,15 +105,8 @@ func GetLastVersion(baseUrl string, client *http.Client) (
 }
 
 //
-// Used to connect the SauceLabs REST API
+// SauceProxy control client: allows you to create, query, and shutdown tunnels.
 //
-type RequestConfig struct {
-	BaseURL   string
-	Username  string
-	Password  string
-	Transport *http.Transport
-}
-
 type Client struct {
 	BaseURL  string
 	Username string
@@ -141,12 +137,12 @@ func (c *Client) executeRequest(req *http.Request) (io.ReadCloser, error) {
 
 type tunnelState struct {
 	Id               string   `json:"id"`
-	TunnelIdentified string   `json:"tunnel_id"`
+	TunnelIdentifier string   `json:"tunnel_id"`
 	DomainNames      []string `json:"domain_names"`
 }
 
 //
-// Return a list of
+// Return the list of tunnel states
 //
 func (c *Client) list() (states []tunnelState, err error) {
 	var url = fmt.Sprintf("%s/%s/tunnels?full=1", c.BaseURL, c.Username)
@@ -181,7 +177,7 @@ func (c *Client) Match(name string, domains []string) (
 	}
 
 	for _, state := range list {
-		if state.TunnelIdentified == name {
+		if state.TunnelIdentifier == name {
 			matches = append(matches, state.Id)
 			continue
 		}
@@ -206,14 +202,6 @@ func (c *Client) Shutdown(id string) error {
 	return c.shutdown("%s/%s/tunnels/%s", id)
 }
 
-func (t *Tunnel) Shutdown() error {
-	return t.Client.shutdown("%s/%s/tunnels/%s", t.Id)
-}
-
-func (t *Tunnel) ShutdownWaitForJobs() error {
-	return t.Client.shutdown("%s/%s/tunnels/%s?wait_for_jobs=1", t.Id)
-}
-
 func (c *Client) shutdown(urlFmt, id string) error {
 	var url = fmt.Sprintf(urlFmt, c.BaseURL, c.Username, id)
 	req, err := http.NewRequest("DELETE", url, nil)
@@ -229,29 +217,19 @@ func (c *Client) shutdown(urlFmt, id string) error {
 	return nil
 }
 
-type Tunnel struct {
-	Client Client
-	Id     string
-
-	// A channel of error used to communicate the state of the tunnel back
-	// to the main goroutine.
-	active chan error
-}
-
-/*
 type jsonMetadata struct {
 	Release     string `json:"release"`
 	GitVersion  string `json:"git_version"`
 	Build       string `json:"build"`
 	Platform    string `json:"platform"`
 	Hostname    string `json:"hostname"`
-	NoFileLimit int    `json:"no_file_limit"`
+	NoFileLimit uint64 `json:"no_file_limit"`
 	Command     string `json:"command"`
 }
 
 type jsonRequest struct {
-	DomainNames      []string     `json:"domain_names"`
 	TunnelIdentifier *string      `json:"tunnel_identifier"`
+	DomainNames      []string     `json:"domain_names"`
 	Metadata         jsonMetadata `json:"metadata"`
 	SSHPort          int          `json:"ssh_port"`
 	NoProxyCaching   bool         `json:"no_proxy_caching"`
@@ -278,6 +256,9 @@ type Request struct {
 	SharedTunnel     bool
 	VMVersion        string
 	NoSSLBumpDomains []string
+
+	// Metadata
+	Command string
 }
 
 //
@@ -286,32 +267,52 @@ type Request struct {
 // This will start a goroutine to keep track of the tunnel's status.
 //
 func (c *Client) Create(request *Request, timeout time.Duration) (
-	tunnel *Tunnel, err error,
+	tunnel Tunnel, err error,
 ) {
-
-}
-
-// FIXME return the number of jobs running
-func RemoveTunnel(id string, config *RequestConfig) error {
-}
-
-func RemoveTunnelForcefully(id string, config *RequestConfig) error {
-	return removeTunnel("%s/%s/tunnels/%s?wait_for_jobs=1", id, config)
-}
-
-func (self *CreateRequest) Execute(config *RequestConfig) (id string, err error) {
-	var url = fmt.Sprintf("%s/%s/tunnels", config.BaseURL, config.Username)
+	hostname, err := os.Hostname()
+	if err != nil {
+		return
+	}
+	var rlimit unix.Rlimit
+	err = unix.Getrlimit(unix.RLIMIT_NOFILE, &rlimit)
+	if err != nil {
+		return
+	}
+	var r = request
+	var doc = jsonRequest{
+		TunnelIdentifier: &r.TunnelIdentifier,
+		DomainNames:      r.DomainNames,
+		Metadata: jsonMetadata{
+			Release:     "4.3.99",
+			GitVersion:  "123467",
+			Build:       "1234",
+			Platform:    "plan9",
+			Hostname:    hostname,
+			NoFileLimit: rlimit.Cur,
+			Command:     r.Command,
+		},
+		SSHPort:          r.KGPPort,
+		NoProxyCaching:   r.NoProxyCaching,
+		UseKGP:           true,
+		FastFailRegexps:  &r.FastFailRegexps,
+		DirectDomains:    &r.DirectDomains,
+		SharedTunnel:     r.SharedTunnel,
+		SquidConfig:      nil,
+		VMVersion:        &r.VMVersion,
+		NoSSLBumpDomains: &r.NoSSLBumpDomains,
+	}
 	var jsonDoc bytes.Buffer
-	if err = encodeJSON(&jsonDoc, self); err != nil {
+	if err = encodeJSON(&jsonDoc, doc); err != nil {
 		return
 	}
 
+	var url = fmt.Sprintf("%s/%s/tunnels", c.BaseURL, c.Username)
 	req, err := http.NewRequest("POST", url, &jsonDoc)
 	if err != nil {
 		return
 	}
 
-	body, err := executeRequest(req, config)
+	body, err := c.executeRequest(req)
 	if err != nil {
 		return
 	}
@@ -324,62 +325,106 @@ func (self *CreateRequest) Execute(config *RequestConfig) (id string, err error)
 	if err != nil {
 		return
 	}
-	id = response.Id
 
+	tunnel.Client = c
+	tunnel.Id = response.Id
+	// err = tunnel.wait(timeout)
 	return
 }
 
-type tunnelStatus struct {
-	Status       string
-	UserShutdown bool `json:"user_shutdown"`
+//
+// Tunnel control interface.
+//
+// You create it by calling Client.Create()
+//
+type Tunnel struct {
+	Client *Client
+	Id     string
+
+	// A channel used to communicate the state of the tunnel back to the main
+	// goroutine.
+	active chan string
 }
 
-func getTunnelStatus(id string, config *RequestConfig) (
-	status tunnelStatus, err error,
+// FIXME the old sauce connect makes an HTTP query and then sleep for 1
+// second up to 60 times. This means the old Sauce Connect would wait up to: 60
+// seconds + 60 * time the HTTP roundtrip.
+//
+// This means we may have to bump this timeout value up from 1 minute.
+const waitTimeout = time.Minute
+
+// Wait for the tunnel to run
+func (t *Tunnel) wait(timeout time.Duration) error {
+	var end = time.Now().Add(timeout)
+
+	for time.Now().Before(end) {
+		status, err := t.status()
+		if err != nil {
+			return err
+		}
+
+		if status == "running" {
+			return nil
+		} else {
+			time.Sleep(time.Second)
+		}
+	}
+
+	return fmt.Errorf(
+		"Tunnel %s didn't come up after %s",
+		t.Id, waitTimeout.String())
+}
+
+func (t *Tunnel) Shutdown() error {
+	return t.Client.shutdown("%s/%s/tunnels/%s", t.Id)
+}
+
+func (t *Tunnel) ShutdownWaitForJobs() error {
+	return t.Client.shutdown("%s/%s/tunnels/%s?wait_for_jobs=1", t.Id)
+}
+
+//
+// status can have the values:
+// - "running" the tunnel is up and running
+// - "terminated" the tunnel isn't running (it's assumed it was terminated, but it could be any state that's != "running")
+// - "user shutdown" the tunnel was shutdown by the user from the web interface
+//
+func (t *Tunnel) status() (
+	status string, err error,
 ) {
-	var url = fmt.Sprintf("%s/%s/tunnels/%s", config.BaseURL, config.Username, id)
+	var c = t.Client
+	var url = fmt.Sprintf("%s/%s/tunnels/%s", c.BaseURL, c.Username, t.Id)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return
 	}
 
-	body, err := executeRequest(req, config)
+	body, err := c.executeRequest(req)
 	if err != nil {
 		return
+	}
+
+	var s struct {
+		Status       string
+		UserShutdown bool `json:"user_shutdown"`
 	}
 
 	if err = decodeJSON(body, &status); err != nil {
 		return
 	}
 
-	return
-}
-
-const (
-	RUNNING = iota
-	USER_SHUTDOWN
-	TERMINATED
-)
-
-func isTunnelTerminated(id string, config *RequestConfig) (
-	status int, err error,
-) {
-	s, err := getTunnelStatus(id, config)
-	if err != nil {
-		return
-	}
-
 	if s.UserShutdown {
-		status = USER_SHUTDOWN
+		status = "user shutdown"
 	} else if s.Status != "running" {
-		status = TERMINATED
+		status = "terminated"
 	} else {
-		status = RUNNING
+		status = "running"
 	}
 
 	return
 }
 
+/*
 type heartBeat struct {
 	KGPConnected         bool `json:"kgp_is_connected"`
 	StatusChangeDuration int  `json:"kgp_seconds_since_last_status_change"`
@@ -456,11 +501,6 @@ func WaitForTunnel(id string, config *RequestConfig) error {
 func (t *Tunnel) Status() error {
 
 }
-
-func (t *Tunnel) Shutdown() error {
-
-}
-
 */
 
 /*

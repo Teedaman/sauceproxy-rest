@@ -1,6 +1,9 @@
 package admin
 
 import (
+	"io"
+	"bytes"
+	"time"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -153,39 +156,6 @@ const tunnelsJSON = `[
   }
 ]`
 
-const createJSON = `{
-  "status": "new",
-  "direct_domains": null,
-  "vm_version": null,
-  "last_connected": null,
-  "shutdown_time": null,
-  "ssh_port": 443,
-  "launch_time": null,
-  "user_shutdown": null,
-  "use_caching_proxy": null,
-  "creation_time": 1467839998,
-  "domain_names": [
-    "sauce-connect.proxy"
-  ],
-  "shared_tunnel": false,
-  "tunnel_identifier": null,
-  "host": null,
-  "no_proxy_caching": false,
-  "owner": "henryprecheur",
-  "use_kgp": true,
-  "no_ssl_bump_domains": null,
-  "id": "49958ce5ec9f49c796542e0c691455a6",
-  "metadata": {
-    "hostname": "Henry's computer",
-    "git_version": "4a804fd",
-    "platform": "Plan9 bitch",
-    "command": "./sc",
-    "build": "Strong",
-    "release": "1.2.3",
-    "no_file_limit": 12345
-  }
-}`
-
 func TestClientMatch(t *testing.T) {
 	var server = makeServer(func(w http.ResponseWriter) {
 		fmt.Fprintln(w, tunnelsJSON)
@@ -242,5 +212,60 @@ func TestClientShutdown404(t *testing.T) {
 	err := client.Shutdown("fakeid")
 	if !strings.HasPrefix(err.Error(), "couldn't find ") {
 		t.Errorf("Invalid error: %s", err.Error())
+	}
+}
+
+const createJSON = `{
+  "status": "new",
+  "direct_domains": null,
+  "vm_version": null,
+  "last_connected": null,
+  "shutdown_time": null,
+  "ssh_port": 443,
+  "launch_time": null,
+  "user_shutdown": null,
+  "use_caching_proxy": null,
+  "creation_time": 1467839998,
+  "domain_names": [
+    "sauce-connect.proxy"
+  ],
+  "shared_tunnel": false,
+  "tunnel_identifier": null,
+  "host": null,
+  "no_proxy_caching": false,
+  "owner": "henryprecheur",
+  "use_kgp": true,
+  "no_ssl_bump_domains": null,
+  "id": "49958ce5ec9f49c796542e0c691455a6",
+  "metadata": {
+    "hostname": "Henry's computer",
+    "git_version": "4a804fd",
+    "platform": "Plan9 bitch",
+    "command": "./sc",
+    "build": "Strong",
+    "release": "1.2.3",
+    "no_file_limit": 12345
+  }
+}`
+
+func TestClientCreate(t *testing.T) {
+	// 1st we'll send the response to a create request
+	var buffer = bytes.NewBufferString(createJSON)
+	var server = makeServer(func(w http.ResponseWriter) {
+		io.Copy(w, buffer)
+	})
+	defer server.Close()
+
+	var client = Client{
+		BaseURL:  server.URL,
+		Username: "username",
+		Password: "password",
+	}
+	var request = Request{
+		DomainNames: []string{"sauce-connect.proxy"},
+	}
+	_, err := client.Create(&request, time.Second)
+	if err != nil {
+		t.Errorf("client.Create errored %+v\n", err)
 	}
 }
