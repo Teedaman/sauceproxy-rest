@@ -1,15 +1,14 @@
 package admin
 
 import (
-	"io"
-	"bytes"
-	"time"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 const versionJson = `{
@@ -49,6 +48,16 @@ func makeServer(f func(w http.ResponseWriter)) *httptest.Server {
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			f(w)
 		}))
+}
+
+func multiResponseServer(responses []string) *httptest.Server {
+	var index = 0
+	return makeServer(func(w http.ResponseWriter) {
+		io.WriteString(w, responses[index])
+		if index < len(responses) {
+			index += 1;
+		}
+	})
 }
 
 func TestGetLastVersion(t *testing.T) {
@@ -248,12 +257,10 @@ const createJSON = `{
   }
 }`
 
+const statusRunningJSON = `{"status": "running", "user_shutdown": null}`
+
 func TestClientCreate(t *testing.T) {
-	// 1st we'll send the response to a create request
-	var serverBuffer = bytes.NewBufferString(createJSON)
-	var server = makeServer(func(w http.ResponseWriter) {
-		io.Copy(w, serverBuffer)
-	})
+	var server = multiResponseServer([]string{createJSON, statusRunningJSON})
 	defer server.Close()
 
 	var client = Client{
@@ -264,8 +271,8 @@ func TestClientCreate(t *testing.T) {
 	var request = Request{
 		DomainNames: []string{"sauce-connect.proxy"},
 	}
-	_, err := client.Create(&request, time.Second)
+	_, err := client.createWithTimeouts(&request, time.Second, time.Second)
 	if err != nil {
-		t.Errorf("client.Create errored %+v\n", err)
+		t.Errorf("client.createWithTimeouts errored %+v\n", err)
 	}
 }

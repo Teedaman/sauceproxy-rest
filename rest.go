@@ -113,6 +113,26 @@ type Client struct {
 	Password string
 
 	Client http.Client
+
+	// Methods to override the default decoding function
+	DecodeJSON func(reader io.ReadCloser, v interface{}) error
+	EncodeJSON func(writer io.Writer, v interface{}) error
+}
+
+func (c *Client) decodeJSON(reader io.ReadCloser, v interface{}) error {
+	if c.DecodeJSON != nil {
+		return c.DecodeJSON(reader, v)
+	} else {
+		return decodeJSON(reader, v)
+	}
+}
+
+func (c *Client) encodeJSON(writer io.Writer, v interface{}) error {
+	if c.EncodeJSON != nil {
+		return c.EncodeJSON(writer, v)
+	} else {
+		return encodeJSON(writer, v)
+	}
 }
 
 //
@@ -156,7 +176,7 @@ func (c *Client) list() (states []tunnelState, err error) {
 		return
 	}
 
-	err = decodeJSON(body, &states)
+	err = c.decodeJSON(body, &states)
 	if err != nil {
 		return
 	}
@@ -261,12 +281,19 @@ type Request struct {
 	Command string
 }
 
+func (c *Client) Create(request *Request) (tunnel Tunnel, err error) {
+	var timeout = time.Minute
+	var wait = time.Minute
+
+	return c.createWithTimeouts(request, timeout, wait)
+}
+
 //
 // Create a new tunnel and wait for it to come up within `timeout`.
 //
 // This will start a goroutine to keep track of the tunnel's status.
 //
-func (c *Client) Create(request *Request, timeout time.Duration) (
+func (c *Client) createWithTimeouts(request *Request, timeout time.Duration, wait time.Duration) (
 	tunnel Tunnel, err error,
 ) {
 	hostname, err := os.Hostname()
@@ -321,14 +348,14 @@ func (c *Client) Create(request *Request, timeout time.Duration) (
 		Id string
 	}
 
-	err = decodeJSON(body, &response)
+	err = c.decodeJSON(body, &response)
 	if err != nil {
 		return
 	}
 
 	tunnel.Client = c
 	tunnel.Id = response.Id
-	// err = tunnel.wait(timeout)
+	err = tunnel.wait(wait)
 	return
 }
 
@@ -353,9 +380,6 @@ type Tunnel struct {
 // second up to 60 times. This means the old Sauce Connect would wait up to: 60
 // seconds + 60 * time the HTTP roundtrip.
 //
-// This means we may have to bump this timeout value up from 1 minute.
-const waitTimeout = time.Minute
-
 // Wait for the tunnel to run
 func (t *Tunnel) wait(timeout time.Duration) error {
 	var end = time.Now().Add(timeout)
@@ -375,7 +399,7 @@ func (t *Tunnel) wait(timeout time.Duration) error {
 
 	return fmt.Errorf(
 		"Tunnel %s didn't come up after %s",
-		t.Id, waitTimeout.String())
+		t.Id, timeout.String())
 }
 
 func (t *Tunnel) Shutdown() error {
@@ -391,6 +415,8 @@ func (t *Tunnel) ShutdownWaitForJobs() error {
 // - "running" the tunnel is up and running
 // - "terminated" the tunnel isn't running (it's assumed it was terminated, but it could be any state that's != "running")
 // - "user shutdown" the tunnel was shutdown by the user from the web interface
+//
+// If the query failed status will return an error.
 //
 func (t *Tunnel) status() (
 	status string, err error,
@@ -408,15 +434,15 @@ func (t *Tunnel) status() (
 	}
 
 	var s struct {
-		Status       string
-		UserShutdown bool `json:"user_shutdown"`
+		Status       string `json:"status"`
+		UserShutdown *bool `json:"user_shutdown"`
 	}
 
-	if err = decodeJSON(body, &status); err != nil {
+	if err = c.decodeJSON(body, &s); err != nil {
 		return
 	}
 
-	if s.UserShutdown {
+	if s.UserShutdown != nil && *s.UserShutdown {
 		status = "user shutdown"
 	} else if s.Status != "running" {
 		status = "terminated"
