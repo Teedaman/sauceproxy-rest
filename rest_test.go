@@ -276,3 +276,51 @@ func TestClientCreate(t *testing.T) {
 		t.Errorf("client.createWithTimeouts errored %+v\n", err)
 	}
 }
+
+func TestClientCreateError(t *testing.T) {
+	var server = multiResponseServer([]string{"ERROR!"})
+	defer server.Close()
+
+	var client = Client{
+		BaseURL:  server.URL,
+		Username: "username",
+		Password: "password",
+	}
+	var request = Request{
+		DomainNames: []string{"sauce-connect.proxy"},
+	}
+	_, err := client.createWithTimeouts(&request, time.Second, 0)
+	if err == nil {
+		t.Errorf("client.createWithTimeouts didn't error")
+	}
+
+	if !(
+		strings.HasPrefix(err.Error(), "couldn't decode JSON document: ")) {
+		t.Errorf("Invalid error: %s", err.Error())
+	}
+}
+
+func TestClientCreateWaitError(t *testing.T) {
+	var server = multiResponseServer(
+		[]string{createJSON, `{"status": "shutdown", "user_shutdown": null}`})
+	defer server.Close()
+
+	var client = Client{
+		BaseURL:  server.URL,
+		Username: "username",
+		Password: "password",
+	}
+	var request = Request{
+		DomainNames: []string{"sauce-connect.proxy"},
+	}
+	_, err := client.createWithTimeouts(&request, time.Second, 0)
+	if err == nil {
+		t.Errorf("client.createWithTimeouts didn't error")
+	}
+
+	if !(
+		strings.HasPrefix(err.Error(), "Tunnel ") &&
+		strings.HasSuffix(err.Error(), " didn't come up after 0")) {
+		t.Errorf("Invalid error: %s", err.Error())
+	}
+}
