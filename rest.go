@@ -373,7 +373,48 @@ type Tunnel struct {
 
 	// A channel used to communicate the state of the tunnel back to the main
 	// goroutine.
-	active chan string
+	disconnected  chan string
+	lastHeartbeat time.Time
+}
+
+func (t *Tunnel) isTerminated() (bool, error) {
+	var status, err = t.status()
+	if err != nil {
+		return false, err
+	}
+
+	return status != "running", nil
+}
+
+//
+// Goroutine that checks if the tunnel is still up and running, and sends a
+// heart beat to indicate the tunnel client is still up.
+//
+// FIXME this changes the be
+func (t *Tunnel) daemon() {
+	for {
+		var termTick = time.Tick(5 * time.Second)
+		var heartbeatTick = time.Tick(30 * time.Second)
+		select {
+		case <-termTick:
+			var term, err = t.isTerminated()
+			if err != nil {
+				// FIXME old sauceconnect ignores error
+			}
+			if term {
+				// FIXME send to chan
+			}
+		case <-heartbeatTick:
+			// FIXME get those values from kgp
+			var connected = true
+			var lastStatusChange = 30 * time.Minute
+
+			var err = t.sendHeartBeat(connected, lastStatusChange)
+			if err != nil {
+				// FIXME old sauceconnect ignores error
+			}
+		}
+	}
 }
 
 // FIXME the old sauce connect makes an HTTP query and then sleep for 1
@@ -382,9 +423,10 @@ type Tunnel struct {
 //
 // Wait for the tunnel to run
 func (t *Tunnel) wait(timeout time.Duration) error {
-	var end = time.Now().Add(timeout)
+	var now = time.Now()
+	var end = now.Add(timeout)
 
-	for time.Now().Before(end) {
+	for !now.After(end) {
 		status, err := t.status()
 		if err != nil {
 			return err
@@ -395,6 +437,7 @@ func (t *Tunnel) wait(timeout time.Duration) error {
 		} else {
 			time.Sleep(time.Second)
 		}
+		now = time.Now()
 	}
 
 	return fmt.Errorf(

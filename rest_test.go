@@ -61,9 +61,7 @@ func multiResponseServer(responses []string) *httptest.Server {
 }
 
 func TestGetLastVersion(t *testing.T) {
-	var server = makeServer(func(w http.ResponseWriter) {
-		fmt.Fprintln(w, versionJson)
-	})
+	var server = multiResponseServer([]string{versionJson})
 	defer server.Close()
 
 	build, url, err := GetLastVersion(server.URL, &http.Client{})
@@ -259,37 +257,34 @@ const createJSON = `{
 
 const statusRunningJSON = `{"status": "running", "user_shutdown": null}`
 
-func TestClientCreate(t *testing.T) {
-	var server = multiResponseServer([]string{createJSON, statusRunningJSON})
-	defer server.Close()
-
+func createTunnel(url string) (Tunnel, error) {
 	var client = Client{
-		BaseURL:  server.URL,
+		BaseURL:  url,
 		Username: "username",
 		Password: "password",
 	}
 	var request = Request{
 		DomainNames: []string{"sauce-connect.proxy"},
 	}
-	_, err := client.createWithTimeouts(&request, time.Second, time.Second)
+	return client.createWithTimeouts(&request, 0, 0)
+}
+
+func TestClientCreate(t *testing.T) {
+	var server = multiResponseServer([]string{createJSON, statusRunningJSON})
+	defer server.Close()
+
+	_, err := createTunnel(server.URL)
+	// client.createWithTimeouts(&request, time.Second, time.Second)
 	if err != nil {
 		t.Errorf("client.createWithTimeouts errored %+v\n", err)
 	}
 }
 
-func TestClientCreateError(t *testing.T) {
+func TestClientCreateBadJSON(t *testing.T) {
 	var server = multiResponseServer([]string{"ERROR!"})
 	defer server.Close()
 
-	var client = Client{
-		BaseURL:  server.URL,
-		Username: "username",
-		Password: "password",
-	}
-	var request = Request{
-		DomainNames: []string{"sauce-connect.proxy"},
-	}
-	_, err := client.createWithTimeouts(&request, time.Second, 0)
+	_, err := createTunnel(server.URL)
 	if err == nil {
 		t.Errorf("client.createWithTimeouts didn't error")
 	}
@@ -304,15 +299,7 @@ func TestClientCreateWaitError(t *testing.T) {
 		[]string{createJSON, `{"status": "shutdown", "user_shutdown": null}`})
 	defer server.Close()
 
-	var client = Client{
-		BaseURL:  server.URL,
-		Username: "username",
-		Password: "password",
-	}
-	var request = Request{
-		DomainNames: []string{"sauce-connect.proxy"},
-	}
-	_, err := client.createWithTimeouts(&request, time.Second, 0)
+	_, err := createTunnel(server.URL)
 	if err == nil {
 		t.Errorf("client.createWithTimeouts didn't error")
 	}
@@ -320,5 +307,26 @@ func TestClientCreateWaitError(t *testing.T) {
 	if !(strings.HasPrefix(err.Error(), "Tunnel ") &&
 		strings.HasSuffix(err.Error(), " didn't come up after 0")) {
 		t.Errorf("Invalid error: %s", err.Error())
+	}
+}
+
+func TestTunnelHeartBeat(t *testing.T) {
+	var server = multiResponseServer(
+		[]string{
+			createJSON,
+			statusRunningJSON,
+			`{"result": true, "id": "49958ce5ec9f49c796542e0c691455a6"}`,
+		})
+	defer server.Close()
+
+	tunnel, err := createTunnel(server.URL)
+	// client.createWithTimeouts(&request, time.Second, time.Second)
+	if err != nil {
+		t.Errorf("client.createWithTimeouts errored %+v\n", err)
+	}
+
+	err = tunnel.sendHeartBeat(true, time.Hour)
+	if err != nil {
+		t.Errorf("tunnel.sendHeartBeat errored %+v\n", err)
 	}
 }
