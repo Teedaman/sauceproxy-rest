@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -42,26 +41,39 @@ const versionJson = `{
     }
 }`
 
-// Helper function to create a fake http server
-func makeServer(f func(w http.ResponseWriter)) *httptest.Server {
+// Helper type to make declarations shorter
+type R func(http.ResponseWriter)
+
+func stringResponse(s string) R {
+	return func(r http.ResponseWriter) {
+		io.WriteString(r, s)
+	}
+}
+
+func errorResponse(code int, s string) R {
+	return func(r http.ResponseWriter) {
+		http.Error(r, s, code)
+	}
+}
+
+// Return each response one after another, keeps repeating the last response
+// once it has reached the end.
+func multiResponseServer(responses []R) *httptest.Server {
+	var index = 0
 	return httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			f(w)
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			responses[index](w)
+			if index < len(responses) {
+				index += 1
+			}
 		}))
 }
 
-func multiResponseServer(responses []string) *httptest.Server {
-	var index = 0
-	return makeServer(func(w http.ResponseWriter) {
-		io.WriteString(w, responses[index])
-		if index < len(responses) {
-			index += 1
-		}
-	})
-}
-
 func TestGetLastVersion(t *testing.T) {
-	var server = multiResponseServer([]string{versionJson})
+	var server = multiResponseServer([]R{
+		// Just return a fake version.json
+		stringResponse(versionJson),
+	})
 	defer server.Close()
 
 	var client = Client{
@@ -81,8 +93,8 @@ func TestGetLastVersion(t *testing.T) {
 }
 
 func TestGetLastVersionBadJSON(t *testing.T) {
-	var server = makeServer(func(w http.ResponseWriter) {
-		fmt.Fprintln(w, "Not a JSON document...")
+	var server = multiResponseServer([]R{
+		stringResponse("Not a JSON document"),
 	})
 	defer server.Close()
 
@@ -101,8 +113,8 @@ func TestGetLastVersionBadJSON(t *testing.T) {
 }
 
 func TestGetLastVersion404(t *testing.T) {
-	var server = makeServer(func(w http.ResponseWriter) {
-		http.Error(w, "nothing to see here", 404)
+	var server = multiResponseServer([]R{
+		errorResponse(404, "Nothing to see here"),
 	})
 	defer server.Close()
 
@@ -121,7 +133,7 @@ func TestGetLastVersion404(t *testing.T) {
 }
 
 func TestGetLastVersionNoServer(t *testing.T) {
-	var server = makeServer(func(w http.ResponseWriter) {})
+	var server = multiResponseServer([]R{})
 	// We close the server right-away so it doesn't response to requests, but we
 	// still keep it around so our client has a 'bad' URL to connect to.
 	server.Close()
@@ -176,8 +188,8 @@ const tunnelsJSON = `[
 ]`
 
 func TestClientMatch(t *testing.T) {
-	var server = makeServer(func(w http.ResponseWriter) {
-		fmt.Fprintln(w, tunnelsJSON)
+	var server = multiResponseServer([]R{
+		stringResponse(tunnelsJSON),
 	})
 	defer server.Close()
 
@@ -199,8 +211,8 @@ func TestClientMatch(t *testing.T) {
 }
 
 func TestClientShutdown(t *testing.T) {
-	var server = makeServer(func(w http.ResponseWriter) {
-		fmt.Fprintln(w, "")
+	var server = multiResponseServer([]R{
+		stringResponse(""),
 	})
 	defer server.Close()
 
@@ -217,8 +229,8 @@ func TestClientShutdown(t *testing.T) {
 }
 
 func TestClientShutdown404(t *testing.T) {
-	var server = makeServer(func(w http.ResponseWriter) {
-		http.Error(w, "nothing to see here", 404)
+	var server = multiResponseServer([]R{
+		errorResponse(404, "nothing to see here"),
 	})
 	defer server.Close()
 
@@ -282,7 +294,10 @@ func createTunnel(url string) (Tunnel, error) {
 }
 
 func TestClientCreate(t *testing.T) {
-	var server = multiResponseServer([]string{createJSON, statusRunningJSON})
+	var server = multiResponseServer([]R{
+		stringResponse(createJSON),
+		stringResponse(statusRunningJSON),
+	})
 	defer server.Close()
 
 	_, err := createTunnel(server.URL)
@@ -292,7 +307,9 @@ func TestClientCreate(t *testing.T) {
 }
 
 func TestClientCreateBadJSON(t *testing.T) {
-	var server = multiResponseServer([]string{"ERROR!"})
+	var server = multiResponseServer([]R{
+		errorResponse(504, "Not available"),
+	})
 	defer server.Close()
 
 	_, err := createTunnel(server.URL)
@@ -300,14 +317,18 @@ func TestClientCreateBadJSON(t *testing.T) {
 		t.Errorf("client.createWithTimeout didn't error")
 	}
 
-	if !(strings.HasPrefix(err.Error(), "couldn't decode JSON document: ")) {
+	if !(
+		strings.HasPrefix(err.Error(), "couldn't find ") &&
+		strings.HasSuffix(err.Error(), "504 Gateway Timeout")) {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
 }
 
 func TestClientCreateWaitError(t *testing.T) {
-	var server = multiResponseServer(
-		[]string{createJSON, `{"status": "shutdown", "user_shutdown": null}`})
+	var server = multiResponseServer([]R{
+		stringResponse(createJSON),
+		stringResponse(`{"status": "shutdown", "user_shutdown": null}`),
+	})
 	defer server.Close()
 
 	_, err := createTunnel(server.URL)
@@ -322,11 +343,11 @@ func TestClientCreateWaitError(t *testing.T) {
 }
 
 func TestTunnelHeartBeat(t *testing.T) {
-	var server = multiResponseServer(
-		[]string{
-			createJSON,
-			statusRunningJSON,
-			`{"result": true, "id": "49958ce5ec9f49c796542e0c691455a6"}`,
+	var server = multiResponseServer([]R{
+		stringResponse(createJSON),
+		stringResponse(statusRunningJSON),
+		stringResponse(
+			`{"result": true, "id": "49958ce5ec9f49c796542e0c691455a6"}`),
 		})
 	defer server.Close()
 
@@ -342,11 +363,10 @@ func TestTunnelHeartBeat(t *testing.T) {
 }
 
 func TestTunnelHeartBeatError(t *testing.T) {
-	var server = multiResponseServer(
-		[]string{
-			createJSON,
-			statusRunningJSON,
-		})
+	var server = multiResponseServer([]R{
+		stringResponse(createJSON),
+		stringResponse(statusRunningJSON),
+	})
 
 	tunnel, err := createTunnel(server.URL)
 	if err != nil {
