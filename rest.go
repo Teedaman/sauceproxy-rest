@@ -131,9 +131,18 @@ func (c *Client) encodeJSON(writer io.Writer, v interface{}) error {
 // Execute HTTP request and return an io.ReadCloser to be decoded
 //
 func (c *Client) executeRequest(
-	method, url string, body io.Reader,
+	method, url string, body interface{},
 ) (io.ReadCloser, error) {
-	req, err := http.NewRequest(method, url, body)
+	var reader io.Reader
+	if body != nil {
+		var buf bytes.Buffer
+		if err := encodeJSON(&buf, body); err != nil {
+			return nil, err
+		}
+		reader = &buf
+	}
+
+	req, err := http.NewRequest(method, url, reader)
 	if err != nil {
 		return nil, err
 	}
@@ -318,14 +327,9 @@ func (c *Client) createWithTimeouts(request *Request, timeout time.Duration, wai
 		VMVersion:        &r.VMVersion,
 		NoSSLBumpDomains: &r.NoSSLBumpDomains,
 	}
-	var jsonDoc bytes.Buffer
-	if err = encodeJSON(&jsonDoc, doc); err != nil {
-		return
-	}
-
 	var url = fmt.Sprintf("%s/%s/tunnels", c.BaseURL, c.Username)
 
-	body, err := c.executeRequest("POST", url, &jsonDoc)
+	body, err := c.executeRequest("POST", url, doc)
 	if err != nil {
 		return
 	}
@@ -487,10 +491,6 @@ func (t *Tunnel) sendHeartBeat(
 		KGPConnected:         connected,
 		StatusChangeDuration: int(duration.Seconds()),
 	}
-	var jsonDoc bytes.Buffer
-	if err := encodeJSON(&jsonDoc, &h); err != nil {
-		return err
-	}
 
 	// The REST call return a JSON document like this:
 	//
@@ -500,7 +500,7 @@ func (t *Tunnel) sendHeartBeat(
 	// return.
 	//
 	// FIXME it looks like result is always true looking at the Resto code
-	_, err := c.executeRequest("POST", url, &jsonDoc)
+	_, err := c.executeRequest("POST", url, &h)
 	if err != nil {
 		return err
 	}
