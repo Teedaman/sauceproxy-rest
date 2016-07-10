@@ -64,7 +64,10 @@ func TestGetLastVersion(t *testing.T) {
 	var server = multiResponseServer([]string{versionJson})
 	defer server.Close()
 
-	build, url, err := GetLastVersion(server.URL, &http.Client{})
+	var client = Client{
+		BaseURL:  server.URL,
+	}
+	build, url, err := client.GetLastVersion()
 
 	if err != nil {
 		t.Errorf("%v", err)
@@ -83,7 +86,10 @@ func TestGetLastVersionBadJSON(t *testing.T) {
 	})
 	defer server.Close()
 
-	_, _, err := GetLastVersion(server.URL, &http.Client{})
+	var client = Client{
+		BaseURL:  server.URL,
+	}
+	_, _, err := client.GetLastVersion()
 
 	if err == nil {
 		t.Error("GetLastVersion == nil")
@@ -100,7 +106,10 @@ func TestGetLastVersion404(t *testing.T) {
 	})
 	defer server.Close()
 
-	_, _, err := GetLastVersion(server.URL, &http.Client{})
+	var client = Client{
+		BaseURL:  server.URL,
+	}
+	_, _, err := client.GetLastVersion()
 
 	if err == nil {
 		t.Error("GetLastVersion == nil")
@@ -117,7 +126,10 @@ func TestGetLastVersionNoServer(t *testing.T) {
 	// still keep it around so our client has a 'bad' URL to connect to.
 	server.Close()
 
-	_, _, err := GetLastVersion(server.URL, &http.Client{})
+	var client = Client{
+		BaseURL:  server.URL,
+	}
+	_, _, err := client.GetLastVersion()
 
 	if err == nil {
 		t.Error("GetLastVersion == nil")
@@ -304,7 +316,8 @@ func TestClientCreateWaitError(t *testing.T) {
 		t.Errorf("client.createWithTimeouts didn't error")
 	}
 
-	if !(strings.HasPrefix(err.Error(), "Tunnel ") &&
+	if !(
+		strings.HasPrefix(err.Error(), "Tunnel ") &&
 		strings.HasSuffix(err.Error(), " didn't come up after 0")) {
 		t.Errorf("Invalid error: %s", err.Error())
 	}

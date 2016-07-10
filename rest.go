@@ -43,20 +43,13 @@ func encodeJSON(w io.Writer, v interface{}) error {
 // Return the newest build number for the platform as determined by
 // runtime.GOOS, and the URL to download the latest verion.
 //
-func GetLastVersion(baseUrl string, client *http.Client) (
+func (c *Client) GetLastVersion() (
 	build int, url string, err error,
 ) {
-	var fullUrl = fmt.Sprintf("%s/versions.json", baseUrl)
+	var fullUrl = fmt.Sprintf("%s/versions.json", c.BaseURL)
 
-	resp, err := client.Get(fullUrl)
+	body, err := c.executeRequest("GET", fullUrl, nil)
 	if err != nil {
-		err = fmt.Errorf("couldn't connect to %s: %s", fullUrl, err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("couldn't find %s: %s", fullUrl, resp.Status)
 		return
 	}
 
@@ -76,8 +69,7 @@ func GetLastVersion(baseUrl string, client *http.Client) (
 		} `json:"Sauce Connect"`
 	}{}
 
-	err = decodeJSON(resp.Body, &jsonStruct)
-	if err != nil {
+	if err = decodeJSON(body, &jsonStruct); err != nil {
 		return
 	}
 
