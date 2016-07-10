@@ -378,8 +378,7 @@ func (t *Tunnel) daemon() {
 			var status, err = t.status()
 			if err != nil {
 				// FIXME old sauceconnect ignores error
-			}
-			if status != "running" {
+			} else if status != "running" {
 				//
 				// The tunnel is down, send its status back to the main loop.
 				//

@@ -306,7 +306,7 @@ func TestClientCreate(t *testing.T) {
 	}
 }
 
-func TestClientCreateBadJSON(t *testing.T) {
+func TestClientCreateHTTPError(t *testing.T) {
 	var server = multiResponseServer([]R{
 		errorResponse(504, "Not available"),
 	})
