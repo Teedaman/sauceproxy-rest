@@ -280,19 +280,17 @@ type Request struct {
 	Command string
 }
 
+// Create a new tunnel and wait for it to come up
 func (c *Client) Create(request *Request) (tunnel Tunnel, err error) {
-	var timeout = time.Minute
-	var wait = time.Minute
-
-	return c.createWithTimeouts(request, timeout, wait)
+	return c.createWithTimeout(request, time.Minute)
 }
 
 //
-// Create a new tunnel and wait for it to come up within `timeout`.
+// Create a new tunnel and wait for it to come up within `wait`.
 //
 // This will start a goroutine to keep track of the tunnel's status.
 //
-func (c *Client) createWithTimeouts(request *Request, timeout time.Duration, wait time.Duration) (
+func (c *Client) createWithTimeout(request *Request, timeout time.Duration) (
 	tunnel Tunnel, err error,
 ) {
 	hostname, err := os.Hostname()
@@ -345,7 +343,7 @@ func (c *Client) createWithTimeouts(request *Request, timeout time.Duration, wai
 
 	tunnel.Client = c
 	tunnel.Id = response.Id
-	err = tunnel.wait(wait)
+	err = tunnel.wait(timeout)
 	return
 }
 

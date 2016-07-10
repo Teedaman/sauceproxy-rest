@@ -278,7 +278,7 @@ func createTunnel(url string) (Tunnel, error) {
 	var request = Request{
 		DomainNames: []string{"sauce-connect.proxy"},
 	}
-	return client.createWithTimeouts(&request, 0, 0)
+	return client.createWithTimeout(&request, 0)
 }
 
 func TestClientCreate(t *testing.T) {
@@ -286,9 +286,8 @@ func TestClientCreate(t *testing.T) {
 	defer server.Close()
 
 	_, err := createTunnel(server.URL)
-	// client.createWithTimeouts(&request, time.Second, time.Second)
 	if err != nil {
-		t.Errorf("client.createWithTimeouts errored %+v\n", err)
+		t.Errorf("client.createWithTimeout errored %+v\n", err)
 	}
 }
 
@@ -298,7 +297,7 @@ func TestClientCreateBadJSON(t *testing.T) {
 
 	_, err := createTunnel(server.URL)
 	if err == nil {
-		t.Errorf("client.createWithTimeouts didn't error")
+		t.Errorf("client.createWithTimeout didn't error")
 	}
 
 	if !(strings.HasPrefix(err.Error(), "couldn't decode JSON document: ")) {
@@ -313,7 +312,7 @@ func TestClientCreateWaitError(t *testing.T) {
 
 	_, err := createTunnel(server.URL)
 	if err == nil {
-		t.Errorf("client.createWithTimeouts didn't error")
+		t.Errorf("client.createWithTimeout didn't error")
 	}
 
 	if !(strings.HasPrefix(err.Error(), "Tunnel ") &&
@@ -332,9 +331,8 @@ func TestTunnelHeartBeat(t *testing.T) {
 	defer server.Close()
 
 	tunnel, err := createTunnel(server.URL)
-	// client.createWithTimeouts(&request, time.Second, time.Second)
 	if err != nil {
-		t.Errorf("client.createWithTimeouts errored %+v\n", err)
+		t.Errorf("client.createWithTimeout errored %+v\n", err)
 	}
 
 	err = tunnel.sendHeartBeat(true, time.Hour)
