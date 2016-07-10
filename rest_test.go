@@ -65,7 +65,7 @@ func TestGetLastVersion(t *testing.T) {
 	defer server.Close()
 
 	var client = Client{
-		BaseURL:  server.URL,
+		BaseURL: server.URL,
 	}
 	build, url, err := client.GetLastVersion()
 
@@ -87,7 +87,7 @@ func TestGetLastVersionBadJSON(t *testing.T) {
 	defer server.Close()
 
 	var client = Client{
-		BaseURL:  server.URL,
+		BaseURL: server.URL,
 	}
 	_, _, err := client.GetLastVersion()
 
@@ -107,7 +107,7 @@ func TestGetLastVersion404(t *testing.T) {
 	defer server.Close()
 
 	var client = Client{
-		BaseURL:  server.URL,
+		BaseURL: server.URL,
 	}
 	_, _, err := client.GetLastVersion()
 
@@ -127,7 +127,7 @@ func TestGetLastVersionNoServer(t *testing.T) {
 	server.Close()
 
 	var client = Client{
-		BaseURL:  server.URL,
+		BaseURL: server.URL,
 	}
 	_, _, err := client.GetLastVersion()
 
@@ -316,8 +316,7 @@ func TestClientCreateWaitError(t *testing.T) {
 		t.Errorf("client.createWithTimeouts didn't error")
 	}
 
-	if !(
-		strings.HasPrefix(err.Error(), "Tunnel ") &&
+	if !(strings.HasPrefix(err.Error(), "Tunnel ") &&
 		strings.HasSuffix(err.Error(), " didn't come up after 0")) {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
