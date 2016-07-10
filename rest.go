@@ -138,7 +138,13 @@ func (c *Client) encodeJSON(writer io.Writer, v interface{}) error {
 //
 // Execute HTTP request and return an io.ReadCloser to be decoded
 //
-func (c *Client) executeRequest(req *http.Request) (io.ReadCloser, error) {
+func (c *Client) executeRequest(
+	method, url string, body io.Reader,
+) (io.ReadCloser, error) {
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, err
+	}
 	req.SetBasicAuth(c.Username, c.Password)
 
 	var client = c.Client
@@ -166,12 +172,8 @@ type tunnelState struct {
 //
 func (c *Client) list() (states []tunnelState, err error) {
 	var url = fmt.Sprintf("%s/%s/tunnels?full=1", c.BaseURL, c.Username)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return
-	}
 
-	body, err := c.executeRequest(req)
+	body, err := c.executeRequest("GET", url, nil)
 	if err != nil {
 		return
 	}
@@ -224,12 +226,8 @@ func (c *Client) Shutdown(id string) error {
 
 func (c *Client) shutdown(urlFmt, id string) error {
 	var url = fmt.Sprintf(urlFmt, c.BaseURL, c.Username, id)
-	req, err := http.NewRequest("DELETE", url, nil)
-	if err != nil {
-		return err
-	}
 
-	_, err = c.executeRequest(req)
+	_, err := c.executeRequest("DELETE", url, nil)
 	if err != nil {
 		return err
 	}
@@ -334,12 +332,8 @@ func (c *Client) createWithTimeouts(request *Request, timeout time.Duration, wai
 	}
 
 	var url = fmt.Sprintf("%s/%s/tunnels", c.BaseURL, c.Username)
-	req, err := http.NewRequest("POST", url, &jsonDoc)
-	if err != nil {
-		return
-	}
 
-	body, err := c.executeRequest(req)
+	body, err := c.executeRequest("POST", url, &jsonDoc)
 	if err != nil {
 		return
 	}
@@ -377,32 +371,27 @@ type Tunnel struct {
 	lastHeartbeat time.Time
 }
 
-func (t *Tunnel) isTerminated() (bool, error) {
-	var status, err = t.status()
-	if err != nil {
-		return false, err
-	}
-
-	return status != "running", nil
-}
-
 //
 // Goroutine that checks if the tunnel is still up and running, and sends a
 // heart beat to indicate the tunnel client is still up.
 //
-// FIXME this changes the be
 func (t *Tunnel) daemon() {
 	for {
 		var termTick = time.Tick(5 * time.Second)
 		var heartbeatTick = time.Tick(30 * time.Second)
 		select {
 		case <-termTick:
-			var term, err = t.isTerminated()
+			var status, err = t.status()
 			if err != nil {
 				// FIXME old sauceconnect ignores error
 			}
-			if term {
-				// FIXME send to chan
+			if status != "running" {
+				//
+				// The tunnel is down, send its status back to the main loop.
+				//
+				t.disconnected <- status
+				close(t.disconnected)
+				break
 			}
 		case <-heartbeatTick:
 			// FIXME get those values from kgp
@@ -466,12 +455,8 @@ func (t *Tunnel) status() (
 ) {
 	var c = t.Client
 	var url = fmt.Sprintf("%s/%s/tunnels/%s", c.BaseURL, c.Username, t.Id)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return
-	}
 
-	body, err := c.executeRequest(req)
+	body, err := c.executeRequest("GET", url, nil)
 	if err != nil {
 		return
 	}
@@ -496,11 +481,6 @@ func (t *Tunnel) status() (
 	return
 }
 
-type heartBeat struct {
-	KGPConnected         bool `json:"kgp_is_connected"`
-	StatusChangeDuration int  `json:"kgp_seconds_since_last_status_change"`
-}
-
 func (t *Tunnel) sendHeartBeat(
 	connected bool,
 	duration time.Duration,
@@ -508,7 +488,10 @@ func (t *Tunnel) sendHeartBeat(
 	var c = t.Client
 	var url = fmt.Sprintf("%s/%s/tunnels/%s/connected", c.BaseURL, c.Username, t.Id)
 
-	var h = heartBeat{
+	var h = struct {
+		KGPConnected         bool `json:"kgp_is_connected"`
+		StatusChangeDuration int  `json:"kgp_seconds_since_last_status_change"`
+	}{
 		KGPConnected:         connected,
 		StatusChangeDuration: int(duration.Seconds()),
 	}
@@ -517,12 +500,6 @@ func (t *Tunnel) sendHeartBeat(
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, &jsonDoc)
-	if err != nil {
-		return err
-	}
-
-	//
 	// The REST call return a JSON document like this:
 	//
 	//	  {"result": true, "id", "<tunnel id>"}
@@ -530,7 +507,8 @@ func (t *Tunnel) sendHeartBeat(
 	// We don't decode it since it doesn't give us any useful information to
 	// return.
 	//
-	_, err = c.executeRequest(req)
+	// FIXME it looks like result is always true looking at the Resto code
+	_, err := c.executeRequest("POST", url, &jsonDoc)
 	if err != nil {
 		return err
 	}
