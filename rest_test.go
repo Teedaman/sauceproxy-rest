@@ -340,3 +340,25 @@ func TestTunnelHeartBeat(t *testing.T) {
 		t.Errorf("tunnel.sendHeartBeat errored %+v\n", err)
 	}
 }
+
+func TestTunnelHeartBeatError(t *testing.T) {
+	var server = multiResponseServer(
+		[]string{
+			createJSON,
+			statusRunningJSON,
+		})
+
+	tunnel, err := createTunnel(server.URL)
+	if err != nil {
+		t.Errorf("client.createWithTimeout errored %+v\n", err)
+	}
+
+	server.Close()
+	err = tunnel.sendHeartBeat(true, time.Hour)
+	if err == nil {
+		t.Errorf("tunnel.sendHeartBeat didn't error\n")
+	}
+	if !strings.HasPrefix(err.Error(), "couldn't connect to ") {
+		t.Errorf("Invalid error: %s", err.Error())
+	}
+}
