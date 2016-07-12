@@ -367,7 +367,7 @@ func (c *Client) createWithTimeout(
 }
 
 type ClientStatus struct {
-	Connected	int
+	Connected	bool
 	LastStatusChange	int64
 }
 
@@ -401,12 +401,13 @@ func (t *Tunnel) loop(
 	var heartbeatTick = time.Tick(heartbeatInterval)
 	// Initialize the client status before we start the status loop
 	var clientStatus ClientStatus = <-t.ClientStatus
+	var connected = clientStatus.Connected
 	var lastChange = time.Unix(clientStatus.LastStatusChange, 0)
-
 
 	for {
 		select {
 		case clientStatus := <-t.ClientStatus:
+			connected = clientStatus.Connected
 			lastChange = time.Unix(clientStatus.LastStatusChange, 0)
 		case <-termTick:
 			var status, err = t.status()
@@ -422,7 +423,7 @@ func (t *Tunnel) loop(
 			}
 		case <-heartbeatTick:
 			var err = t.sendHeartBeat(
-				clientStatus.Connected == 1,
+				connected,
 				time.Since(lastChange),
 			)
 			if err != nil {
@@ -514,10 +515,10 @@ func (t *Tunnel) sendHeartBeat(
 
 	var h = struct {
 		KGPConnected         bool `json:"kgp_is_connected"`
-		StatusChangeDuration int  `json:"kgp_seconds_since_last_status_change"`
+		StatusChangeDuration int64  `json:"kgp_seconds_since_last_status_change"`
 	}{
 		KGPConnected:         connected,
-		StatusChangeDuration: int(duration.Seconds()),
+		StatusChangeDuration: int64(duration.Seconds()),
 	}
 
 	// The REST call return a JSON document like this:
