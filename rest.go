@@ -281,16 +281,30 @@ type Request struct {
 }
 
 // Create a new tunnel and wait for it to come up
+//
+// This will start a goroutine to keep track of the tunnel's status using the
+// ClientStatus & ServerStatus channels
+//
 func (c *Client) Create(request *Request) (tunnel Tunnel, err error) {
-	return c.createWithTimeout(request, time.Minute)
+	fmt.Println("PRECREATE")
+	tunnel, err = c.createWithTimeout(request, time.Minute)
+	fmt.Println("POST CREATE", err)
+	if err == nil {
+		go tunnel.loop(
+			5*time.Second,
+			30*time.Second,
+		)
+	}
+	return
 }
 
 //
 // Create a new tunnel and wait for it to come up within `wait`.
 //
-// This will start a goroutine to keep track of the tunnel's status.
-//
-func (c *Client) createWithTimeout(request *Request, timeout time.Duration) (
+func (c *Client) createWithTimeout(
+	request *Request,
+	timeout time.Duration,
+) (
 	tunnel Tunnel, err error,
 ) {
 	hostname, err := os.Hostname()
@@ -344,7 +358,17 @@ func (c *Client) createWithTimeout(request *Request, timeout time.Duration) (
 	tunnel.Client = c
 	tunnel.Id = response.Id
 	err = tunnel.wait(timeout)
+	// Only create channels if the tunnel succesfully come up
+	if err == nil {
+		tunnel.ServerStatus = make(chan string)
+		tunnel.ClientStatus = make(chan ClientStatus)
+	}
 	return
+}
+
+type ClientStatus struct {
+	Connected	int
+	LastStatusChange	int64
 }
 
 //
@@ -361,19 +385,29 @@ type Tunnel struct {
 
 	// A channel used to communicate the state of the tunnel back to the main
 	// goroutine.
-	disconnected  chan string
-	lastHeartbeat time.Time
+	ServerStatus chan string
+	ClientStatus chan ClientStatus
 }
 
 //
 // Goroutine that checks if the tunnel is still up and running, and sends a
 // heart beat to indicate the tunnel client is still up.
 //
-func (t *Tunnel) daemon() {
+func (t *Tunnel) loop(
+	serverStatusInterval time.Duration,
+	heartbeatInterval time.Duration,
+) {
+	var termTick = time.Tick(serverStatusInterval)
+	var heartbeatTick = time.Tick(heartbeatInterval)
+	// Initialize the client status before we start the status loop
+	var clientStatus ClientStatus = <-t.ClientStatus
+	var lastChange = time.Unix(clientStatus.LastStatusChange, 0)
+
+
 	for {
-		var termTick = time.Tick(5 * time.Second)
-		var heartbeatTick = time.Tick(30 * time.Second)
 		select {
+		case clientStatus := <-t.ClientStatus:
+			lastChange = time.Unix(clientStatus.LastStatusChange, 0)
 		case <-termTick:
 			var status, err = t.status()
 			if err != nil {
@@ -382,16 +416,15 @@ func (t *Tunnel) daemon() {
 				//
 				// The tunnel is down, send its status back to the main loop.
 				//
-				t.disconnected <- status
-				close(t.disconnected)
-				break
+				t.ServerStatus <- status
+				close(t.ServerStatus)
+				return // We're done exit the loop
 			}
 		case <-heartbeatTick:
-			// FIXME get those values from kgp
-			var connected = true
-			var lastStatusChange = 30 * time.Minute
-
-			var err = t.sendHeartBeat(connected, lastStatusChange)
+			var err = t.sendHeartBeat(
+				clientStatus.Connected == 1,
+				time.Since(lastChange),
+			)
 			if err != nil {
 				// FIXME old sauceconnect ignores error
 			}
@@ -465,10 +498,8 @@ func (t *Tunnel) status() (
 
 	if s.UserShutdown != nil && *s.UserShutdown {
 		status = "user shutdown"
-	} else if s.Status != "running" {
-		status = "terminated"
 	} else {
-		status = "running"
+		status = s.Status
 	}
 
 	return

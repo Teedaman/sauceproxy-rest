@@ -317,8 +317,7 @@ func TestClientCreateHTTPError(t *testing.T) {
 		t.Errorf("client.createWithTimeout didn't error")
 	}
 
-	if !(
-		strings.HasPrefix(err.Error(), "couldn't find ") &&
+	if !(strings.HasPrefix(err.Error(), "couldn't find ") &&
 		strings.HasSuffix(err.Error(), "504 Gateway Timeout")) {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
@@ -348,7 +347,7 @@ func TestTunnelHeartBeat(t *testing.T) {
 		stringResponse(statusRunningJSON),
 		stringResponse(
 			`{"result": true, "id": "49958ce5ec9f49c796542e0c691455a6"}`),
-		})
+	})
 	defer server.Close()
 
 	tunnel, err := createTunnel(server.URL)
@@ -382,3 +381,63 @@ func TestTunnelHeartBeatError(t *testing.T) {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
 }
+
+// Run until server shuts down
+func TestTunnelLoop(t *testing.T) {
+	var server = multiResponseServer([]R{
+		stringResponse(createJSON),
+		stringResponse(statusRunningJSON),
+		stringResponse(statusRunningJSON),
+		stringResponse(`{"result": true, "tunnel_id": "fakeid"}`),
+		stringResponse(`{"status": "shutdown", "user_shutdown": null}`),
+	})
+
+	tunnel, err := createTunnel(server.URL)
+	if err != nil {
+		t.Errorf("client.createWithTimeout errored %+v\n", err)
+	}
+	go tunnel.loop(
+		20 * time.Millisecond, // Make sure status check happens before heartbeat
+		30 * time.Millisecond,
+	)
+	// Notify the Tunnel object that KGP is "up"
+	tunnel.ClientStatus <- ClientStatus{Connected: 1, LastStatusChange: 0}
+
+	var serverStatus = <-tunnel.ServerStatus
+	if serverStatus != "shutdown" {
+		t.Errorf("Invalid server status %+v\n", serverStatus)
+	}
+	/*
+	_, ok := <-tunnel.ServerStatus
+	if !ok {
+		t.Errorf("ServerStatus wasn't closed")
+	}
+	*/
+}
+
+/*
+// Run until KGP client shuts down
+func TestTunnelLoopClientStop(t *testing.T) {
+	var server = multiResponseServer([]R{
+		stringResponse(createJSON),
+		stringResponse(statusRunningJSON),
+		stringResponse(statusRunningJSON),
+		stringResponse(`{"result": true, "tunnel_id": "fakeid"}`),
+	})
+
+	tunnel, err := createTunnel(server.URL)
+	if err != nil {
+		t.Errorf("client.createWithTimeout errored %+v\n", err)
+	}
+	go tunnel.loop(
+		20 * time.Millisecond, // Make sure status check happens before heartbeat
+		30 * time.Millisecond,
+	)
+	tunnel.ClientStatus <- ClientStatus{Connected: 1, LastStatusChange: 0}
+	// Notify the Tunnel object that KGP is "up"
+	var serverStatus = <-tunnel.ServerStatus
+	if serverStatus != "shutdown" {
+		t.Errorf("Invalid server status %+v\n", serverStatus)
+	}
+}
+*/
