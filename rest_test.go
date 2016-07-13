@@ -397,12 +397,12 @@ func TestTunnelLoop(t *testing.T) {
 		t.Errorf("client.createWithTimeout errored %+v\n", err)
 	}
 	go tunnel.loop(
-		2 * time.Millisecond, // Make sure status check happens before heartbeat
-		3 * time.Millisecond,
+		2*time.Millisecond, // Make sure status check happens before heartbeat
+		3*time.Millisecond,
 	)
 	// Notify the Tunnel object that KGP is "up"
 	tunnel.ClientStatus <- ClientStatus{
-		Connected: true,
+		Connected:        true,
 		LastStatusChange: 0,
 	}
 
@@ -416,20 +416,21 @@ func TestTunnelLoop(t *testing.T) {
 	}
 }
 
-func heartbeatChecker(connected bool, changeDuration int64, t *testing.T) (
-	func(http.ResponseWriter, *http.Request),
-) {
+func heartbeatChecker(
+	connected bool,
+	changeDuration int64,
+	t *testing.T,
+) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var h struct {
-			KGPConnected         bool `json:"kgp_is_connected"`
-			StatusChangeDuration int64  `json:"kgp_seconds_since_last_status_change"`
+			KGPConnected         bool  `json:"kgp_is_connected"`
+			StatusChangeDuration int64 `json:"kgp_seconds_since_last_status_change"`
 		}
 		if err := decodeJSON(r.Body, &h); err != nil {
 			t.Errorf("decodeJSON errored %+v\n", err)
 		}
-		if (
-			h.KGPConnected != connected ||
-			h.StatusChangeDuration != changeDuration) {
+		if h.KGPConnected != connected ||
+			h.StatusChangeDuration != changeDuration {
 			t.Errorf(
 				"Invalid values: %v, %v != %v %v\n",
 				h.KGPConnected,
@@ -458,20 +459,20 @@ func TestTunnelLoopClientStop(t *testing.T) {
 	go tunnel.loop(
 		// Using the timing of the 2 loops to ensure that we get 2 heartbeats
 		// before we check if the server is up.
-		5 * time.Millisecond,
-		2 * time.Millisecond,
+		5*time.Millisecond,
+		2*time.Millisecond,
 	)
 	var now = time.Now()
 	var before = now.Add(-1 * time.Second)
 	// Notify the Tunnel object that KGP is "up"
 	tunnel.ClientStatus <- ClientStatus{
-		Connected: true,
+		Connected:        true,
 		LastStatusChange: before.Unix(),
 	}
-	time.Sleep(3 * time.Millisecond)  // Make sure the request was handled
+	time.Sleep(3 * time.Millisecond) // Make sure the request was handled
 	// Notify the tunnel the KGP went "down"
 	tunnel.ClientStatus <- ClientStatus{
-		Connected: false,
+		Connected:        false,
 		LastStatusChange: now.Unix(),
 	}
 

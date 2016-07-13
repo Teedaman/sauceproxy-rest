@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	_ "io/ioutil"
 	"net/http"
 	"os"
 	"runtime"
@@ -286,9 +285,7 @@ type Request struct {
 // ClientStatus & ServerStatus channels
 //
 func (c *Client) Create(request *Request) (tunnel Tunnel, err error) {
-	fmt.Println("PRECREATE")
 	tunnel, err = c.createWithTimeout(request, time.Minute)
-	fmt.Println("POST CREATE", err)
 	if err == nil {
 		go tunnel.loop(
 			5*time.Second,
@@ -367,8 +364,8 @@ func (c *Client) createWithTimeout(
 }
 
 type ClientStatus struct {
-	Connected	bool
-	LastStatusChange	int64
+	Connected        bool
+	LastStatusChange int64
 }
 
 //
@@ -406,7 +403,7 @@ func (t *Tunnel) loop(
 
 	for {
 		select {
-		case clientStatus := <-t.ClientStatus:
+		case clientStatus = <-t.ClientStatus:
 			connected = clientStatus.Connected
 			lastChange = time.Unix(clientStatus.LastStatusChange, 0)
 		case <-termTick:
@@ -514,8 +511,8 @@ func (t *Tunnel) sendHeartBeat(
 	var url = fmt.Sprintf("%s/%s/tunnels/%s/connected", c.BaseURL, c.Username, t.Id)
 
 	var h = struct {
-		KGPConnected         bool `json:"kgp_is_connected"`
-		StatusChangeDuration int64  `json:"kgp_seconds_since_last_status_change"`
+		KGPConnected         bool  `json:"kgp_is_connected"`
+		StatusChangeDuration int64 `json:"kgp_seconds_since_last_status_change"`
 	}{
 		KGPConnected:         connected,
 		StatusChangeDuration: int64(duration.Seconds()),
