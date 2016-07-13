@@ -187,7 +187,7 @@ const tunnelsJSON = `[
   }
 ]`
 
-func TestClientMatch(t *testing.T) {
+func TestClientFind(t *testing.T) {
 	var server = multiResponseServer([]R{
 		stringResponse(tunnelsJSON),
 	})
@@ -199,14 +199,14 @@ func TestClientMatch(t *testing.T) {
 		Password: "password",
 	}
 
-	var matches, err = client.Match("fakeid", []string{"sauce-connect.proxy"})
+	var matches, err = client.Find("fakeid", []string{"sauce-connect.proxy"})
 
 	if err != nil {
-		t.Errorf("client.Match errored %+v\n", err)
+		t.Errorf("client.Find errored %+v\n", err)
 	}
 
 	if !reflect.DeepEqual(matches, []string{"fakeid"}) {
-		t.Errorf("client.Match returned %+v\n", matches)
+		t.Errorf("client.Find returned %+v\n", matches)
 	}
 }
 

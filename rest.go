@@ -195,10 +195,10 @@ func (c *Client) list() (states []tunnelState, err error) {
 }
 
 //
-// Match tunnels: named tunnel with `name`, or tunnel matching one or more of
+// Find tunnels: named tunnel with `name`, or tunnel matching one or more of
 // `domains`.
 //
-func (c *Client) Match(name string, domains []string) (
+func (c *Client) Find(name string, domains []string) (
 	matches []string, err error,
 ) {
 	list, err := c.list()
