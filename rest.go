@@ -87,6 +87,11 @@ func (c *Client) GetLastVersion() (
 		}
 	case "darwin":
 		x = p.Osx
+	default:
+		build = 0
+		url = ""
+		err = fmt.Errorf("Unknown platform: %v", runtime.GOOS)
+		return
 	}
 
 	build = x.Build
@@ -155,7 +160,10 @@ func (c *Client) executeRequest(
 
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		return nil, fmt.Errorf("couldn't find %s: %s", req.URL, resp.Status)
+		return nil, fmt.Errorf(
+			"error querying from %s. HTTP status: %s",
+			req.URL,
+			resp.Status)
 	}
 
 	return resp.Body, nil
@@ -469,7 +477,8 @@ func (t *Tunnel) ShutdownWaitForJobs() error {
 //
 // status can have the values:
 // - "running" the tunnel is up and running
-// - "terminated" the tunnel isn't running (it's assumed it was terminated, but it could be any state that's != "running")
+// - "halting" the tunnel is shutting down
+// - "terminated" the tunnel was shutdown
 // - "user shutdown" the tunnel was shutdown by the user from the web interface
 //
 // If the query failed status will return an error.

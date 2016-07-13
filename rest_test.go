@@ -127,7 +127,7 @@ func TestGetLastVersion404(t *testing.T) {
 		t.Error("GetLastVersion == nil")
 	}
 
-	if !strings.HasPrefix(err.Error(), "couldn't find ") {
+	if !strings.HasPrefix(err.Error(), "error querying ") {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
 }
@@ -241,7 +241,7 @@ func TestClientShutdown404(t *testing.T) {
 	}
 
 	err := client.Shutdown("fakeid")
-	if !strings.HasPrefix(err.Error(), "couldn't find ") {
+	if !strings.HasPrefix(err.Error(), "error querying ") {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
 }
@@ -317,7 +317,7 @@ func TestClientCreateHTTPError(t *testing.T) {
 		t.Errorf("client.createWithTimeout didn't error")
 	}
 
-	if !(strings.HasPrefix(err.Error(), "couldn't find ") &&
+	if !(strings.HasPrefix(err.Error(), "error querying ") &&
 		strings.HasSuffix(err.Error(), "504 Gateway Timeout")) {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
