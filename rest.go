@@ -1,12 +1,12 @@
-package admin
+package rest
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/url"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"time"
@@ -295,7 +295,6 @@ type Request struct {
 //
 // This will start a goroutine to keep track of the tunnel's status using the
 // ClientStatus & ServerStatus channels
-//
 func (c *Client) Create(request *Request) (tunnel Tunnel, err error) {
 	tunnel, err = c.createWithTimeout(request, time.Minute)
 	if err == nil {
