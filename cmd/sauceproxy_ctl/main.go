@@ -69,11 +69,27 @@ func main() {
 
 	var client = rest.Client{
 		BaseURL:  o.RestUrl,
+		// FIXME rename those in the rest lib later
 		Username:     o.User,
 		Password: o.ApiKey,
 	}
 	if len(o.Verbose) > 0 {
 		client.DecodeJSON = verboseDecodeJSON
 		client.EncodeJSON = verboseEncodeJSON
+	}
+	fmt.Printf("%#v\n", parser.Active.Name)
+	switch parser.Active.Name {
+	case "checkversion":
+		build, u, err := client.GetLastVersion()
+		if err == nil {
+			fmt.Printf("%d %s\n", build, u)
+		} else {
+			fmt.Fprintf(
+				os.Stderr,
+				"error while check lastest version: %v\n",
+				err)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command: %s\n", parser.Active.Name)
 	}
 }
