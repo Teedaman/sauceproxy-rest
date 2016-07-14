@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"net/http"
 	"os"
 	"runtime"
@@ -43,9 +44,12 @@ func encodeJSON(w io.Writer, v interface{}) error {
 // runtime.GOOS, and the URL to download the latest verion.
 //
 func (c *Client) GetLastVersion() (
-	build int, url string, err error,
+	build int, downloadUrl string, err error,
 ) {
-	var fullUrl = fmt.Sprintf("%s/versions.json", c.BaseURL)
+	// We use only the hostname part of base url
+	u, err := url.Parse(c.BaseURL)
+	u.Path = ""
+	var fullUrl = fmt.Sprintf("%s/versions.json", u)
 
 	body, err := c.executeRequest("GET", fullUrl, nil)
 	if err != nil {
@@ -89,13 +93,13 @@ func (c *Client) GetLastVersion() (
 		x = p.Osx
 	default:
 		build = 0
-		url = ""
+		downloadUrl = ""
 		err = fmt.Errorf("Unknown platform: %v", runtime.GOOS)
 		return
 	}
 
 	build = x.Build
-	url = x.DownloadUrl
+	downloadUrl = x.DownloadUrl
 
 	return
 }
