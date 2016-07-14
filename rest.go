@@ -17,7 +17,6 @@ import (
 //
 // Decode `reader` into the object `v`, and close `reader` after.
 //
-//
 func decodeJSON(reader io.ReadCloser, v interface{}) error {
 	var err = json.NewDecoder(reader).Decode(v)
 	reader.Close()
@@ -51,11 +50,6 @@ func (c *Client) GetLastVersion() (
 	u.Path = ""
 	var fullUrl = fmt.Sprintf("%s/versions.json", u)
 
-	body, err := c.executeRequest("GET", fullUrl, nil)
-	if err != nil {
-		return
-	}
-
 	// Structures we use to decode the json document
 	type jsonBuild struct {
 		Build       int
@@ -72,7 +66,8 @@ func (c *Client) GetLastVersion() (
 		} `json:"Sauce Connect"`
 	}{}
 
-	if err = decodeJSON(body, &jsonStruct); err != nil {
+	err = c.executeRequest("GET", fullUrl, nil, &jsonStruct)
+	if err != nil {
 		return
 	}
 
@@ -139,38 +134,45 @@ func (c *Client) encodeJSON(writer io.Writer, v interface{}) error {
 // Execute HTTP request and return an io.ReadCloser to be decoded
 //
 func (c *Client) executeRequest(
-	method, url string, body interface{},
-) (io.ReadCloser, error) {
+	method, url string,
+	request, response interface{},
+) error {
 	var reader io.Reader
-	if body != nil {
+	// Encode request JSON if needed
+	if request != nil {
 		var buf bytes.Buffer
-		if err := encodeJSON(&buf, body); err != nil {
-			return nil, err
+		if err := encodeJSON(&buf, request); err != nil {
+			return err
 		}
 		reader = &buf
 	}
 
 	req, err := http.NewRequest(method, url, reader)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	req.SetBasicAuth(c.Username, c.Password)
 
 	var client = c.Client
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't connect to %s: %s", req.URL, err)
+		return fmt.Errorf("couldn't connect to %s: %s", req.URL, err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"error querying from %s. HTTP status: %s",
 			req.URL,
 			resp.Status)
 	}
 
-	return resp.Body, nil
+	// Decode response if needed
+	if response != nil {
+		return decodeJSON(resp.Body, response)
+	}
+
+	return nil
 }
 
 type tunnelState struct {
@@ -185,15 +187,7 @@ type tunnelState struct {
 func (c *Client) list() (states []tunnelState, err error) {
 	var url = fmt.Sprintf("%s/%s/tunnels?full=1", c.BaseURL, c.Username)
 
-	body, err := c.executeRequest("GET", url, nil)
-	if err != nil {
-		return
-	}
-
-	err = c.decodeJSON(body, &states)
-	if err != nil {
-		return
-	}
+	err = c.executeRequest("GET", url, nil, &states)
 
 	return
 }
@@ -239,12 +233,7 @@ func (c *Client) Shutdown(id string) error {
 func (c *Client) shutdown(urlFmt, id string) error {
 	var url = fmt.Sprintf(urlFmt, c.BaseURL, c.Username, id)
 
-	_, err := c.executeRequest("DELETE", url, nil)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return c.executeRequest("DELETE", url, nil, nil)
 }
 
 type jsonMetadata struct {
@@ -359,18 +348,12 @@ func (c *Client) createWithTimeout(
 		VMVersion:        &r.VMVersion,
 		NoSSLBumpDomains: &r.NoSSLBumpDomains,
 	}
-	var url = fmt.Sprintf("%s/%s/tunnels", c.BaseURL, c.Username)
-
-	body, err := c.executeRequest("POST", url, doc)
-	if err != nil {
-		return
-	}
-
 	var response struct {
 		Id string
 	}
+	var url = fmt.Sprintf("%s/%s/tunnels", c.BaseURL, c.Username)
 
-	err = c.decodeJSON(body, &response)
+	err = c.executeRequest("POST", url, doc, &response)
 	if err != nil {
 		return
 	}
@@ -504,17 +487,13 @@ func (t *Tunnel) status() (
 	var c = t.Client
 	var url = fmt.Sprintf("%s/%s/tunnels/%s", c.BaseURL, c.Username, t.Id)
 
-	body, err := c.executeRequest("GET", url, nil)
-	if err != nil {
-		return
-	}
-
 	var s struct {
 		Status       string `json:"status"`
 		UserShutdown *bool  `json:"user_shutdown"`
 	}
 
-	if err = c.decodeJSON(body, &s); err != nil {
+	err = c.executeRequest("GET", url, nil, &s)
+	if err != nil {
 		return
 	}
 
@@ -550,7 +529,7 @@ func (t *Tunnel) sendHeartBeat(
 	// return.
 	//
 	// FIXME it looks like result is always true looking at the Resto code
-	_, err := c.executeRequest("POST", url, &h)
+	err := c.executeRequest("POST", url, &h, nil)
 	if err != nil {
 		return err
 	}

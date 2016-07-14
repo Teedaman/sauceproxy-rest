@@ -1,16 +1,16 @@
 package main
 
 import (
-	"log"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/jessevdk/go-flags"
 	"io"
+	"log"
 	"os"
 
-	// "github.com/saucelabs/sauceproxy-rest"
-	rest "../.."
+	// rest "../.."
+	rest "github.com/saucelabs/sauceproxy-rest"
 )
 
 type CommonOptions struct {
@@ -107,15 +107,15 @@ func main() {
 
 		tunnel, err := client.Create(&rest.Request{
 			TunnelIdentifier: options.TunnelIdentifier,
-			DomainNames: options.TunnelDomains,
-			DirectDomains: options.DirectDomains,
-			KGPPort: options.KgpPort,
-			NoProxyCaching: options.NoProxyCaching,
-			FastFailRegexps: options.FastFailRegexps,
-			SharedTunnel: options.SharedTunnel,
-			VMVersion: options.VmVersion,
+			DomainNames:      options.TunnelDomains,
+			DirectDomains:    options.DirectDomains,
+			KGPPort:          options.KgpPort,
+			NoProxyCaching:   options.NoProxyCaching,
+			FastFailRegexps:  options.FastFailRegexps,
+			SharedTunnel:     options.SharedTunnel,
+			VMVersion:        options.VmVersion,
 			NoSSLBumpDomains: options.NoSslBumpDomains,
-			Command: "sauceproxy-rest",
+			Command:          "sauceproxy-rest",
 		})
 		if err != nil {
 			logger.Fatalln("Unable to create tunnel:", err)
