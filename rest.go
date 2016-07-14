@@ -279,10 +279,10 @@ type Request struct {
 	TunnelIdentifier string
 	DomainNames      []string
 
+	DirectDomains    []string
 	KGPPort          int
 	NoProxyCaching   bool
 	FastFailRegexps  []string
-	DirectDomains    []string
 	SharedTunnel     bool
 	VMVersion        string
 	NoSSLBumpDomains []string
@@ -307,6 +307,8 @@ func (c *Client) Create(request *Request) (tunnel Tunnel, err error) {
 	return
 }
 
+const DefaultDomain = "sauce-connect.proxy"
+
 //
 // Create a new tunnel and wait for it to come up within `wait`.
 //
@@ -325,10 +327,20 @@ func (c *Client) createWithTimeout(
 	if err != nil {
 		return
 	}
+
 	var r = request
+	var domainNames []string
+	if r.DomainNames == nil {
+		if r.TunnelIdentifier == "" {
+			domainNames = []string{DefaultDomain}
+		}
+	} else {
+		domainNames = r.DomainNames
+	}
+
 	var doc = jsonRequest{
 		TunnelIdentifier: &r.TunnelIdentifier,
-		DomainNames:      r.DomainNames,
+		DomainNames:      domainNames,
 		Metadata: jsonMetadata{
 			Release:     "4.3.99",
 			GitVersion:  "123467",
