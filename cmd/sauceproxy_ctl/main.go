@@ -14,8 +14,8 @@ import (
 )
 
 type CommonOptions struct {
-	User    string `short:"u" long:"user" value-name:"<username>" description:"The environment variable SAUCE_USERNAME can also be used." required:"yes"`
-	ApiKey  string `short:"k" long:"api-key" value-name:"<api-key>" description:"The environment variable SAUCE_ACCESS_KEY can also be used." required:"yes"`
+	User    string `short:"u" long:"user" value-name:"<username>" description:"The environment variable SAUCE_USERNAME can also be used." required:"yes" env:"SAUCE_USERNAME"`
+	ApiKey  string `short:"k" long:"api-key" value-name:"<api-key>" description:"The environment variable SAUCE_ACCESS_KEY can also be used." required:"yes" env:"SAUCE_ACCESS_KEY"`
 	RestUrl string `short:"x" long:"rest-url" value-name:"<arg>" description:"Advanced feature: Connect to Sauce REST API at alternative URL. Use only if directed to do so by Sauce Labs support." default:"https://saucelabs.com/rest/v1"`
 	Help    bool   `short:"h" long:"help" description:"Show usage information."`
 	Verbose []bool `short:"v" long:"verbose" description:"Enable verbose debugging."`
