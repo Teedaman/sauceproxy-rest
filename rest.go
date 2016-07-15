@@ -114,7 +114,10 @@ type Client struct {
 	EncodeJSON func(writer io.Writer, v interface{}) error
 }
 
-func (c *Client) decodeJSON(reader io.ReadCloser, v interface{}) error {
+func (c *Client) decode(reader io.ReadCloser, v interface{}) error {
+	if reader == nil && v != nil {
+		return fmt.Errorf("can't decode JSON from a null reader")
+	}
 	if c.DecodeJSON != nil {
 		return c.DecodeJSON(reader, v)
 	} else {
@@ -122,7 +125,10 @@ func (c *Client) decodeJSON(reader io.ReadCloser, v interface{}) error {
 	}
 }
 
-func (c *Client) encodeJSON(writer io.Writer, v interface{}) error {
+func (c *Client) encode(writer io.Writer, v interface{}) error {
+	if writer == nil && v != nil {
+		return fmt.Errorf("can't encode JSON to a null writer")
+	}
 	if c.EncodeJSON != nil {
 		return c.EncodeJSON(writer, v)
 	} else {
@@ -141,7 +147,7 @@ func (c *Client) executeRequest(
 	// Encode request JSON if needed
 	if request != nil {
 		var buf bytes.Buffer
-		if err := encodeJSON(&buf, request); err != nil {
+		if err := c.encode(&buf, request); err != nil {
 			return err
 		}
 		reader = &buf
@@ -169,7 +175,7 @@ func (c *Client) executeRequest(
 
 	// Decode response if needed
 	if response != nil {
-		return decodeJSON(resp.Body, response)
+		return c.decode(resp.Body, response)
 	}
 
 	return nil
