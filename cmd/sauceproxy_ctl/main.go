@@ -14,8 +14,8 @@ import (
 )
 
 type CommonOptions struct {
-	User    string `short:"u" long:"user" value-name:"<username>" description:"The environment variable SAUCE_USERNAME can also be used."`
-	ApiKey  string `short:"k" long:"api-key" value-name:"<api-key>" description:"The environment variable SAUCE_ACCESS_KEY can also be used."`
+	User    string `short:"u" long:"user" value-name:"<username>" description:"The environment variable SAUCE_USERNAME can also be used." required:"yes"`
+	ApiKey  string `short:"k" long:"api-key" value-name:"<api-key>" description:"The environment variable SAUCE_ACCESS_KEY can also be used." required:"yes"`
 	RestUrl string `short:"x" long:"rest-url" value-name:"<arg>" description:"Advanced feature: Connect to Sauce REST API at alternative URL. Use only if directed to do so by Sauce Labs support." default:"https://saucelabs.com/rest/v1"`
 	Help    bool   `short:"h" long:"help" description:"Show usage information."`
 	Verbose []bool `short:"v" long:"verbose" description:"Enable verbose debugging."`
@@ -24,12 +24,12 @@ type CommonOptions struct {
 type TunnelOptions struct {
 	TunnelIdentifier string   `short:"i" long:"tunnel-identifier" value-name:"<id>" description:"Don't automatically assign jobs to this tunnel. Jobs will use it only by explicitly providing the right identifier."`
 	TunnelDomains    []string `short:"t" long:"tunnel-domains" value-name:"<...>" description:"Inverse of '--direct-domains'. Only requests for domains in this list will be sent through the tunnel. Overrides '--direct-domains'."`
-	DirectDomains    []string `short:"D" long:"direct-domains" value-name:"<...>" description:"Comma-separated list of domains. Requests whose host matches one of these will be relayed directly through the internet, instead of through the tunnel."`
 }
 
 type CreateOptions struct {
 	TunnelOptions
 
+	DirectDomains    []string `short:"D" long:"direct-domains" value-name:"<...>" description:"Comma-separated list of domains. Requests whose host matches one of these will be relayed directly through the internet, instead of through the tunnel."`
 	NoProxyCaching   bool     `short:"N" long:"no-proxy-caching" description:"Disable caching in Sauce Connect. All requests will be sent through the tunnel."`
 	KgpPort          int      `long:"kgp-port" hidden:"true" default:"443"`
 	FastFailRegexps  []string `short:"F" long:"fast-fail-regexps" value-name:"<...>" description:"Comma-separated list of regular expressions. Requests matching one of these will get dropped instantly and will not go through the tunnel."`
@@ -73,6 +73,18 @@ func main() {
 		CommonOptions
 		CheckVersion struct{}      `command:"checkversion"`
 		Create       CreateOptions `command:"create"`
+		Shutdown     struct {
+			Arg struct {
+				Id string `description:"Tunnel ID (not tunnel identifier)"`
+			} `positional-args:"yes" required:"yes"`
+		} `command:"shutdown"`
+		Status struct {
+			Arg struct {
+				Id string `description:"Tunnel ID (not tunnel identifier)"`
+			} `positional-args:"yes" required:"yes"`
+		} `command:"status"`
+		Find TunnelOptions `command:"find"`
+		List struct{} `command:"list"`
 	}
 	parser := flags.NewParser(&o, flags.Default)
 	extra, err := parser.ParseArgs(os.Args[1:])
@@ -120,9 +132,39 @@ func main() {
 		if err != nil {
 			logger.Fatalln("Unable to create tunnel:", err)
 		}
-		_ = tunnel
 		fmt.Fprintln(os.Stderr, "Tunnel successfully created")
 		fmt.Println(tunnel.Id)
+	case "shutdown":
+		var id = o.Shutdown.Arg.Id
+		err := client.Shutdown(id)
+		if err != nil {
+			logger.Fatalln("Unable to shutdown tunnel:", err)
+		}
+		fmt.Println("Tunnel", id, "shutting down.")
+	case "status":
+		var id = o.Status.Arg.Id
+		status, err := client.Status(id)
+		if err != nil {
+			logger.Fatalln("Unable to shutdown tunnel:", err)
+		}
+		fmt.Println(status)
+	case "find":
+		var q = o.Find
+		matches, err := client.Find(q.TunnelIdentifier, q.TunnelDomains)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		for _, id := range matches {
+			fmt.Println(id)
+		}
+	case "list":
+		matches, err := client.List()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		for _, id := range matches {
+			fmt.Println(id)
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", parser.Active.Name)
 	}

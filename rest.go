@@ -184,10 +184,23 @@ type tunnelState struct {
 //
 // Return the list of tunnel states
 //
-func (c *Client) list() (states []tunnelState, err error) {
+func (c *Client) listTunnels() (states []tunnelState, err error) {
 	var url = fmt.Sprintf("%s/%s/tunnels?full=1", c.BaseURL, c.Username)
 
 	err = c.executeRequest("GET", url, nil, &states)
+
+	return
+}
+
+func (c *Client) List() (ids []string, err error) {
+	states, err := c.listTunnels()
+	if err != nil {
+		return
+	}
+
+	for _, state := range states {
+		ids = append(ids, state.Id)
+	}
 
 	return
 }
@@ -199,13 +212,13 @@ func (c *Client) list() (states []tunnelState, err error) {
 func (c *Client) Find(name string, domains []string) (
 	matches []string, err error,
 ) {
-	list, err := c.list()
+	list, err := c.listTunnels()
 	if err != nil {
 		return
 	}
 
 	for _, state := range list {
-		if state.TunnelIdentifier == name {
+		if name != "" && state.TunnelIdentifier == name {
 			matches = append(matches, state.Id)
 			continue
 		}
@@ -413,7 +426,7 @@ func (t *Tunnel) loop(
 			connected = clientStatus.Connected
 			lastChange = time.Unix(clientStatus.LastStatusChange, 0)
 		case <-termTick:
-			var status, err = t.status()
+			var status, err = t.Status()
 			if err != nil {
 				// FIXME old sauceconnect ignores error
 			} else if status != "running" {
@@ -446,7 +459,7 @@ func (t *Tunnel) wait(timeout time.Duration) error {
 	var end = now.Add(timeout)
 
 	for !now.After(end) {
-		status, err := t.status()
+		status, err := t.Status()
 		if err != nil {
 			return err
 		}
@@ -479,13 +492,10 @@ func (t *Tunnel) ShutdownWaitForJobs() error {
 // - "terminated" the tunnel was shutdown
 // - "user shutdown" the tunnel was shutdown by the user from the web interface
 //
-// If the query failed status will return an error.
-//
-func (t *Tunnel) status() (
+func (c *Client) Status(id string) (
 	status string, err error,
 ) {
-	var c = t.Client
-	var url = fmt.Sprintf("%s/%s/tunnels/%s", c.BaseURL, c.Username, t.Id)
+	var url = fmt.Sprintf("%s/%s/tunnels/%s", c.BaseURL, c.Username, id)
 
 	var s struct {
 		Status       string `json:"status"`
@@ -504,6 +514,12 @@ func (t *Tunnel) status() (
 	}
 
 	return
+}
+
+func (t *Tunnel) Status() (
+	status string, err error,
+) {
+	return t.Client.Status(t.Id)
 }
 
 func (t *Tunnel) sendHeartBeat(
