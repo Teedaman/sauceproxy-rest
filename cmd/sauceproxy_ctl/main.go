@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -67,46 +68,69 @@ func verboseEncodeJSON(w io.Writer, v interface{}) error {
 	return nil
 }
 
-func main() {
-	logger := log.New(os.Stderr, "", 0)
-	var o struct {
-		CommonOptions
-		CheckVersion struct{}      `command:"checkversion"`
-		Create       CreateOptions `command:"create"`
-		Shutdown     struct {
-			Arg struct {
-				Id string `description:"Tunnel ID (not tunnel identifier)"`
-			} `positional-args:"yes" required:"yes"`
-		} `command:"shutdown"`
-		Status struct {
-			Arg struct {
-				Id string `description:"Tunnel ID (not tunnel identifier)"`
-			} `positional-args:"yes" required:"yes"`
-		} `command:"status"`
-		Find TunnelOptions `command:"find"`
-		List struct{} `command:"list"`
-	}
-	parser := flags.NewParser(&o, flags.Default)
-	extra, err := parser.ParseArgs(os.Args[1:])
+type Options struct {
+	CommonOptions
+	CheckVersion struct{}      `command:"checkversion"`
+	Create       CreateOptions `command:"create"`
+	Shutdown     struct {
+		Arg struct {
+			Id string `description:"Tunnel ID (not tunnel identifier)"`
+		} `positional-args:"yes" required:"yes"`
+	} `command:"shutdown"`
+	Status struct {
+		Arg struct {
+			Id string `description:"Tunnel ID (not tunnel identifier)"`
+		} `positional-args:"yes" required:"yes"`
+	} `command:"status"`
+	Find TunnelOptions `command:"find"`
+	List struct{} `command:"list"`
+}
+
+// Return the command name and the options object
+//
+// Exits if there's any error
+func ParseArguments(args []string) (command string, options Options) {
+	parser := flags.NewParser(&options, flags.Default)
+	extra, err := parser.ParseArgs(args)
 
 	if err != nil {
+		// FIXME go-flags outputs the error in stderr in some cases, check it
+		// does it for all errors
 		os.Exit(1)
 	}
 	if len(extra) != 0 {
 		logger.Fatalln("Extra arguments:", extra)
 	}
+	command = parser.Active.Name
 
+	return
+}
+
+var logger *log.Logger
+
+func init() {
+	logger = log.New(os.Stderr, "", 0)
+}
+
+func main() {
+	var command, o = ParseArguments(os.Args[1:])
+
+	var httpclient = http.Client{
+		Transport: &http.Transport{ Proxy: http.ProxyFromEnvironment },
+	}
 	var client = rest.Client{
 		BaseURL: o.RestUrl,
 		// FIXME rename those in the rest lib later
 		Username: o.User,
 		Password: o.ApiKey,
+
+		Client: httpclient,
 	}
 	if len(o.Verbose) > 0 {
 		client.DecodeJSON = verboseDecodeJSON
 		client.EncodeJSON = verboseEncodeJSON
 	}
-	switch parser.Active.Name {
+	switch command {
 	case "checkversion":
 		build, u, err := client.GetLastVersion()
 		if err == nil {
@@ -132,7 +156,7 @@ func main() {
 		if err != nil {
 			logger.Fatalln("Unable to create tunnel:", err)
 		}
-		fmt.Fprintln(os.Stderr, "Tunnel successfully created")
+		logger.Println("Tunnel successfully created")
 		fmt.Println(tunnel.Id)
 	case "shutdown":
 		var id = o.Shutdown.Arg.Id
@@ -140,7 +164,7 @@ func main() {
 		if err != nil {
 			logger.Fatalln("Unable to shutdown tunnel:", err)
 		}
-		fmt.Println("Tunnel", id, "shutting down.")
+		logger.Println("Tunnel", id, "shutting down.")
 	case "status":
 		var id = o.Status.Arg.Id
 		status, err := client.Status(id)
@@ -166,6 +190,6 @@ func main() {
 			fmt.Println(id)
 		}
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\n", parser.Active.Name)
+		logger.Fatalln("unknown command:", command)
 	}
 }
