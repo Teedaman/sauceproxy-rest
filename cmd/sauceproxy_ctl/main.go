@@ -46,7 +46,7 @@ type CreateOptions struct {
 func verboseDecodeJSON(reader io.ReadCloser, v interface{}) error {
 	var buf bytes.Buffer
 	io.Copy(&buf, reader)
-	fmt.Fprintf(os.Stderr, "response:\n%s\n\n", buf)
+	logger.Println("response:", buf, "\n")
 	var err = json.NewDecoder(&buf).Decode(v)
 	reader.Close()
 	if err != nil {
@@ -59,7 +59,7 @@ func verboseDecodeJSON(reader io.ReadCloser, v interface{}) error {
 func verboseEncodeJSON(w io.Writer, v interface{}) error {
 	var buf bytes.Buffer
 	var err = json.NewEncoder(&buf).Encode(v)
-	fmt.Fprintf(os.Stderr, "request:\n%s\n\n", buf)
+	logger.Println("request:", buf, "\n")
 	io.Copy(w, &buf)
 	if err != nil {
 		return fmt.Errorf("couldn't encode JSON document: %s", err)
