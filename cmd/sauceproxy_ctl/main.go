@@ -46,7 +46,7 @@ type CreateOptions struct {
 func verboseDecodeJSON(reader io.ReadCloser, v interface{}) error {
 	var buf bytes.Buffer
 	io.Copy(&buf, reader)
-	logger.Println("response:", buf, "\n")
+	logger.Println("response:", buf.String(), "\n")
 	var err = json.NewDecoder(&buf).Decode(v)
 	reader.Close()
 	if err != nil {
