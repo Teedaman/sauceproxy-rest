@@ -37,6 +37,21 @@ func encodeJSON(w io.Writer, v interface{}) error {
 }
 
 //
+// SauceProxy control client: allows you to create, query, and shutdown tunnels.
+//
+type Client struct {
+	BaseURL  string
+	Username string
+	Password string
+
+	Client http.Client
+
+	// Methods to override the default decoding function
+	DecodeJSON func(reader io.ReadCloser, v interface{}) error
+	EncodeJSON func(writer io.Writer, v interface{}) error
+}
+
+//
 // Query `baseURL/versions.json` for a new version of Sauce Connect
 //
 // Return the newest build number for the platform as determined by
@@ -99,19 +114,16 @@ func (c *Client) GetLastVersion() (
 	return
 }
 
-//
-// SauceProxy control client: allows you to create, query, and shutdown tunnels.
-//
-type Client struct {
-	BaseURL  string
-	Username string
-	Password string
+func (c *Client) ReportCrash(tunnel, info, logs string) error {
+	var doc = struct {
+		Tunnel	string `json:"Tunnel"`
+		Info	string `json:"Info"`
+		Logs	string `json:"Logs"`
+	}{ Tunnel: tunnel, Info: info, Logs: logs }
 
-	Client http.Client
+	var url = fmt.Sprintf("%s/%s/errors", c.BaseURL, c.Username)
 
-	// Methods to override the default decoding function
-	DecodeJSON func(reader io.ReadCloser, v interface{}) error
-	EncodeJSON func(writer io.Writer, v interface{}) error
+	return c.executeRequest("POST", url, doc, nil)
 }
 
 func (c *Client) decode(reader io.ReadCloser, v interface{}) error {
