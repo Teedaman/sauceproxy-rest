@@ -116,10 +116,10 @@ func (c *Client) GetLastVersion() (
 
 func (c *Client) ReportCrash(tunnel, info, logs string) error {
 	var doc = struct {
-		Tunnel	string `json:"Tunnel"`
-		Info	string `json:"Info"`
-		Logs	string `json:"Logs"`
-	}{ Tunnel: tunnel, Info: info, Logs: logs }
+		Tunnel string `json:"Tunnel"`
+		Info   string `json:"Info"`
+		Logs   string `json:"Logs"`
+	}{Tunnel: tunnel, Info: info, Logs: logs}
 
 	var url = fmt.Sprintf("%s/%s/errors", c.BaseURL, c.Username)
 
@@ -257,14 +257,20 @@ func (c *Client) Find(name string, domains []string) (
 //
 // Shutdown tunnel `id`
 //
-func (c *Client) Shutdown(id string) error {
+func (c *Client) Shutdown(id string) (int, error) {
 	return c.shutdown("%s/%s/tunnels/%s", id)
 }
 
-func (c *Client) shutdown(urlFmt, id string) error {
+func (c *Client) shutdown(urlFmt, id string) (int, error) {
 	var url = fmt.Sprintf(urlFmt, c.BaseURL, c.Username, id)
 
-	return c.executeRequest("DELETE", url, nil, nil)
+	var response struct {
+		JobsRunning int `json:"jobs_running"`
+	}
+	err := c.executeRequest("DELETE", url, nil, &response)
+	jobsRunning := response.JobsRunning
+
+	return jobsRunning, err
 }
 
 type jsonMetadata struct {
@@ -495,11 +501,11 @@ func (t *Tunnel) wait(timeout time.Duration) error {
 		t.Id, timeout.String())
 }
 
-func (t *Tunnel) Shutdown() error {
-	return t.Client.shutdown("%s/%s/tunnels/%s", t.Id)
+func (t *Tunnel) Shutdown() (int, error) {
+	return t.Client.shutdown("%s/%s/tunnels/%s?wait_for_jobs=0", t.Id)
 }
 
-func (t *Tunnel) ShutdownWaitForJobs() error {
+func (t *Tunnel) ShutdownWaitForJobs() (int, error) {
 	return t.Client.shutdown("%s/%s/tunnels/%s?wait_for_jobs=1", t.Id)
 }
 
