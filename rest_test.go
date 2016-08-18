@@ -1,8 +1,8 @@
 package rest
 
 import (
+	"fmt"
 	"io"
-    "fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -223,39 +223,33 @@ func TestClientShutdown(t *testing.T) {
 		Password: "password",
 	}
 
-	err := client.Shutdown("fakeid", nil)
+	_, err := client.Shutdown("fakeid")
 	if err != nil {
 		t.Errorf("client.Shutdown errored %+v\n", err)
 	}
 }
 
 func TestClientShutdownRunning(t *testing.T) {
-    var jobsRunning = 0
-    var server = multiResponseServer([]R{
-        stringResponse(fmt.Sprintf("{ \"jobs_running\": %d }", jobsRunning)),
-    })
+	var jobsRunning = 0
+	var server = multiResponseServer([]R{
+		stringResponse(fmt.Sprintf("{ \"jobs_running\": %d }", jobsRunning)),
+	})
 
-    var client = Client{
-        BaseURL:  server.URL,
-        Username: "username",
-        Password: "password",
-    }
+	var client = Client{
+		BaseURL:  server.URL,
+		Username: "username",
+		Password: "password",
+	}
 
-    var response struct {
-        Jobs_running int
-    }
-    // just make sure this isn't 0
-    response.Jobs_running = 999
-
-    err := client.Shutdown("fakeid", &response)
-    if err != nil {
-        t.Errorf("client.Shutdown errored %+v\n", err)
-    }
-    if response.Jobs_running != jobsRunning {
-        t.Errorf("client.Shutdown did not return proper jobs_runnng value, was %d expected %d",
-                 response.Jobs_running,
-                 jobsRunning)
-    }
+	jobs, err := client.Shutdown("fakeid")
+	if err != nil {
+		t.Errorf("client.Shutdown errored %+v\n", err)
+	}
+	if jobs != jobsRunning {
+		t.Errorf("client.Shutdown did not return proper jobs_runnng value, was %d expected %d",
+			jobsRunning,
+			jobs)
+	}
 }
 
 func TestClientShutdown404(t *testing.T) {
@@ -270,7 +264,7 @@ func TestClientShutdown404(t *testing.T) {
 		Password: "password",
 	}
 
-	err := client.Shutdown("fakeid", nil)
+	_, err := client.Shutdown("fakeid")
 	if !strings.HasPrefix(err.Error(), "error querying ") {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
