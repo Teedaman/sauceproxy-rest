@@ -257,14 +257,14 @@ func (c *Client) Find(name string, domains []string) (
 //
 // Shutdown tunnel `id`
 //
-func (c *Client) Shutdown(id string) error {
-	return c.shutdown("%s/%s/tunnels/%s", id)
+func (c *Client) Shutdown(id string, response interface{}) error {
+	return c.shutdown("%s/%s/tunnels/%s", id, &response)
 }
 
-func (c *Client) shutdown(urlFmt, id string) error {
+func (c *Client) shutdown(urlFmt, id string, response interface{}) error {
 	var url = fmt.Sprintf(urlFmt, c.BaseURL, c.Username, id)
 
-	return c.executeRequest("DELETE", url, nil, nil)
+	return c.executeRequest("DELETE", url, nil, &response)
 }
 
 type jsonMetadata struct {
@@ -495,12 +495,12 @@ func (t *Tunnel) wait(timeout time.Duration) error {
 		t.Id, timeout.String())
 }
 
-func (t *Tunnel) Shutdown() error {
-	return t.Client.shutdown("%s/%s/tunnels/%s", t.Id)
+func (t *Tunnel) Shutdown(response interface{}) error {
+	return t.Client.shutdown("%s/%s/tunnels/%s?wait_for_jobs=0", t.Id, &response)
 }
 
-func (t *Tunnel) ShutdownWaitForJobs() error {
-	return t.Client.shutdown("%s/%s/tunnels/%s?wait_for_jobs=1", t.Id)
+func (t *Tunnel) ShutdownWaitForJobs(response interface{}) error {
+	return t.Client.shutdown("%s/%s/tunnels/%s?wait_for_jobs=1", t.Id, &response)
 }
 
 //

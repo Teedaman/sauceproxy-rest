@@ -2,6 +2,7 @@ package rest
 
 import (
 	"io"
+    "fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -212,7 +213,7 @@ func TestClientFind(t *testing.T) {
 
 func TestClientShutdown(t *testing.T) {
 	var server = multiResponseServer([]R{
-		stringResponse(""),
+		stringResponse("{ \"jobs_running\": 0 }"),
 	})
 	defer server.Close()
 
@@ -222,10 +223,39 @@ func TestClientShutdown(t *testing.T) {
 		Password: "password",
 	}
 
-	err := client.Shutdown("fakeid")
+	err := client.Shutdown("fakeid", nil)
 	if err != nil {
 		t.Errorf("client.Shutdown errored %+v\n", err)
 	}
+}
+
+func TestClientShutdownRunning(t *testing.T) {
+    var jobsRunning = 0
+    var server = multiResponseServer([]R{
+        stringResponse(fmt.Sprintf("{ \"jobs_running\": %d }", jobsRunning)),
+    })
+
+    var client = Client{
+        BaseURL:  server.URL,
+        Username: "username",
+        Password: "password",
+    }
+
+    var response struct {
+        Jobs_running int
+    }
+    // just make sure this isn't 0
+    response.Jobs_running = 999
+
+    err := client.Shutdown("fakeid", &response)
+    if err != nil {
+        t.Errorf("client.Shutdown errored %+v\n", err)
+    }
+    if response.Jobs_running != jobsRunning {
+        t.Errorf("client.Shutdown did not return proper jobs_runnng value, was %d expected %d",
+                 response.Jobs_running,
+                 jobsRunning)
+    }
 }
 
 func TestClientShutdown404(t *testing.T) {
@@ -240,7 +270,7 @@ func TestClientShutdown404(t *testing.T) {
 		Password: "password",
 	}
 
-	err := client.Shutdown("fakeid")
+	err := client.Shutdown("fakeid", nil)
 	if !strings.HasPrefix(err.Error(), "error querying ") {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
