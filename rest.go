@@ -210,17 +210,8 @@ func (c *Client) listTunnels() (states []tunnelState, err error) {
 	return
 }
 
-func (c *Client) List() (ids []string, err error) {
-	states, err := c.listTunnels()
-	if err != nil {
-		return
-	}
-
-	for _, state := range states {
-		ids = append(ids, state.Id)
-	}
-
-	return
+func (c *Client) List() (states []tunnelState, err error) {
+	return states, err := c.listTunnels()
 }
 
 //
