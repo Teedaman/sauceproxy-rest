@@ -45,6 +45,21 @@ const versionJson = `{
 // Helper type to make declarations shorter
 type R func(http.ResponseWriter, *http.Request)
 
+func checkDuplicate(list []string) bool { // check an array for duplicates
+	seen := make(map[string]int)
+
+	for _, item := range list {
+		_, exists := seen[item]
+
+		if exists {
+			return true
+		} else {
+			seen[item] = 1
+		}
+	}
+	return false
+}
+
 func stringResponse(s string) R {
 	return func(r http.ResponseWriter, q *http.Request) {
 		io.WriteString(r, s)
@@ -153,42 +168,42 @@ func TestGetLastVersionNoServer(t *testing.T) {
 	}
 }
 
-const tunnelsJSON = `[
-  {
-    "status": "running",
-    "direct_domains": null,
-    "vm_version": null,
-    "last_connected": 1467691618,
-    "shutdown_time": null,
-    "ssh_port": 443,
-    "launch_time": 1467690963,
-    "user_shutdown": null,
-    "use_caching_proxy": null,
-    "creation_time": 1467690959,
-    "domain_names": [
-      "sauce-connect.proxy"
-    ],
-    "shared_tunnel": false,
-    "tunnel_identifier": null,
-    "host": "maki81134.miso.saucelabs.com",
-    "no_proxy_caching": false,
-    "owner": "henryprecheur",
-    "use_kgp": true,
-    "no_ssl_bump_domains": null,
-    "id": "fakeid",
-    "metadata": {
-      "hostname": "debian-desktop",
-      "git_version": "39e807b",
-      "platform": "Linux 4.6.0-1-amd64 #1 SMP Debian 4.6.2-2 (2016-06-25) x86_64",
-      "command": "./sc -u henryprecheur -k ****",
-      "build": "2396",
-      "release": "4.3.16",
-      "nofile_limit": 1024
-    }
-  }
-]`
-
 func TestClientFind(t *testing.T) {
+	const tunnelsJSON = `[
+      {
+        "status": "running",
+        "direct_domains": null,
+        "vm_version": null,
+        "last_connected": 1467691618,
+        "shutdown_time": null,
+        "ssh_port": 443,
+        "launch_time": 1467690963,
+        "user_shutdown": null,
+        "use_caching_proxy": null,
+        "creation_time": 1467690959,
+        "domain_names": [
+          "sauce-connect.proxy"
+        ],
+        "shared_tunnel": false,
+        "tunnel_identifier": null,
+        "host": "maki81134.miso.saucelabs.com",
+        "no_proxy_caching": false,
+        "owner": "henryprecheur",
+        "use_kgp": true,
+        "no_ssl_bump_domains": null,
+        "id": "fakeid",
+        "metadata": {
+          "hostname": "debian-desktop",
+          "git_version": "39e807b",
+          "platform": "Linux 4.6.0-1-amd64 #1 SMP Debian 4.6.2-2 (2016-06-25) x86_64",
+          "command": "./sc -u henryprecheur -k ****",
+          "build": "2396",
+          "release": "4.3.16",
+          "nofile_limit": 1024
+        }
+      }
+    ]`
+
 	var server = multiResponseServer([]R{
 		stringResponse(tunnelsJSON),
 	})
@@ -208,6 +223,98 @@ func TestClientFind(t *testing.T) {
 
 	if !reflect.DeepEqual(matches, []string{"fakeid"}) {
 		t.Errorf("client.Find returned %+v\n", matches)
+	}
+}
+
+// if there are any duplicates in the array returned by Find, fail
+func TestClientFindDuplicate(t *testing.T) {
+	const tunnelsJSON = `[
+      {
+        "status": "running",
+        "direct_domains": null,
+        "vm_version": null,
+        "last_connected": 1467691618,
+        "shutdown_time": null,
+        "ssh_port": 443,
+        "launch_time": 1467690963,
+        "user_shutdown": null,
+        "use_caching_proxy": null,
+        "creation_time": 1467690959,
+        "domain_names": [
+          "sauce-connect.proxy"
+        ],
+        "shared_tunnel": false,
+        "tunnel_identifier": null,
+        "host": "maki81134.miso.saucelabs.com",
+        "no_proxy_caching": false,
+        "owner": "henryprecheur",
+        "use_kgp": true,
+        "no_ssl_bump_domains": null,
+        "id": "fakeid",
+        "metadata": {
+          "hostname": "debian-desktop",
+          "git_version": "39e807b",
+          "platform": "Linux 4.6.0-1-amd64 #1 SMP Debian 4.6.2-2 (2016-06-25) x86_64",
+          "command": "./sc -u henryprecheur -k ****",
+          "build": "2396",
+          "release": "4.3.16",
+          "nofile_limit": 1024
+        }
+      },
+      {
+        "status": "running",
+        "direct_domains": null,
+        "vm_version": null,
+        "last_connected": 1467691618,
+        "shutdown_time": null,
+        "ssh_port": 443,
+        "launch_time": 1467690963,
+        "user_shutdown": null,
+        "use_caching_proxy": null,
+        "creation_time": 1467690959,
+        "domain_names": [
+          "sauce-connect.proxy",
+          "test.proxy"
+        ],
+        "shared_tunnel": false,
+        "tunnel_identifier": null,
+        "host": "maki81134.miso.saucelabs.com",
+        "no_proxy_caching": false,
+        "owner": "henryprecheur",
+        "use_kgp": true,
+        "no_ssl_bump_domains": null,
+        "id": "test.id",
+        "metadata": {
+          "hostname": "debian-desktop",
+          "git_version": "39e807b",
+          "platform": "Linux 4.6.0-1-amd64 #1 SMP Debian 4.6.2-2 (2016-06-25) x86_64",
+          "command": "./sc -u henryprecheur -k ****",
+          "build": "2396",
+          "release": "4.3.16",
+          "nofile_limit": 1024
+        }
+      }
+    ]`
+
+	var server = multiResponseServer([]R{
+		stringResponse(tunnelsJSON),
+	})
+	defer server.Close()
+
+	var client = Client{
+		BaseURL:  server.URL,
+		Username: "username",
+		Password: "password",
+	}
+
+	var matches, err = client.Find("fakeid", []string{"sauce-connect.proxy", "test.proxy"})
+
+	if err != nil {
+		t.Errorf("client.Find errored %+v\n", err)
+	}
+
+	if checkDuplicate(matches) {
+		t.Errorf("client.Find returned duplicate tunnels")
 	}
 }
 

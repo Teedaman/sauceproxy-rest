@@ -223,6 +223,17 @@ func (c *Client) List() (ids []string, err error) {
 	return
 }
 
+func checkOverlappingDomains(localDomains []string, remoteDomains []string) bool {
+	for _, localDomain := range localDomains {
+		for _, remoteDomain := range remoteDomains {
+			if localDomain == remoteDomain {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 //
 // Find tunnels: named tunnel with `name`, or tunnel matching one or more of
 // `domains`.
@@ -241,13 +252,8 @@ func (c *Client) Find(name string, domains []string) (
 			continue
 		}
 
-		for _, localDomain := range domains {
-			for _, remoteDomain := range state.DomainNames {
-				if localDomain == remoteDomain {
-					matches = append(matches, state.Id)
-					continue
-				}
-			}
+		if searchDomains(domains, state.DomainNames) {
+			matches = append(matches, state.Id)
 		}
 	}
 
