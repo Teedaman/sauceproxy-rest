@@ -223,7 +223,7 @@ func (c *Client) List() (ids []string, err error) {
 	return
 }
 
-func searchDomains(localDomains []string, remoteDomains []string) bool {
+func checkOverlappingDomains(localDomains []string, remoteDomains []string) bool {
 	for _, localDomain := range localDomains {
 		for _, remoteDomain := range remoteDomains {
 			if localDomain == remoteDomain {
