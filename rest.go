@@ -252,7 +252,7 @@ func (c *Client) Find(name string, domains []string) (
 			continue
 		}
 
-		if searchDomains(domains, state.DomainNames) {
+		if checkOverlappingDomains(domains, state.DomainNames) {
 			matches = append(matches, state.Id)
 		}
 	}
@@ -392,7 +392,8 @@ func (c *Client) createWithTimeout(
 		NoSSLBumpDomains: &r.NoSSLBumpDomains,
 	}
 	var response struct {
-		Id string
+		Id string `json:"id"`
+		Host string `json:"host"`
 	}
 	var url = fmt.Sprintf("%s/%s/tunnels", c.BaseURL, c.Username)
 
@@ -403,6 +404,7 @@ func (c *Client) createWithTimeout(
 
 	tunnel.Client = c
 	tunnel.Id = response.Id
+	tunnel.Host = response.Host
 	err = tunnel.wait(timeout)
 	// Only create channels if the tunnel succesfully come up
 	if err == nil {
@@ -428,7 +430,7 @@ type ClientStatus struct {
 type Tunnel struct {
 	Client *Client
 	Id     string
-
+	Host string
 	// A channel used to communicate the state of the tunnel back to the main
 	// goroutine.
 	ServerStatus chan string
