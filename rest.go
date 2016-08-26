@@ -392,7 +392,7 @@ func (c *Client) createWithTimeout(
 		NoSSLBumpDomains: &r.NoSSLBumpDomains,
 	}
 	var response struct {
-		Id string `json:"id"`
+		Id   string `json:"id"`
 		Host string `json:"host"`
 	}
 	var url = fmt.Sprintf("%s/%s/tunnels", c.BaseURL, c.Username)
@@ -430,7 +430,7 @@ type ClientStatus struct {
 type Tunnel struct {
 	Client *Client
 	Id     string
-	Host string
+	Host   string
 	// A channel used to communicate the state of the tunnel back to the main
 	// goroutine.
 	ServerStatus chan string

@@ -465,10 +465,10 @@ func TestClientCreateWaitError(t *testing.T) {
 	if err == nil {
 		t.Errorf("client.createWithTimeout didn't error")
 	}
-
+	// go 1.7 adds an s after the # of seconds, previous versions don't have the s
 	if !(strings.HasPrefix(err.Error(), "Tunnel ") &&
 		(strings.HasSuffix(err.Error(), " didn't come up after 0s")) ||
-         strings.HasSuffix(err.Error(), " didn't come up after 0")) {
+		strings.HasSuffix(err.Error(), " didn't come up after 0")) {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
 }
