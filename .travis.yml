@@ -7,5 +7,5 @@ install:
   - go get golang.org/x/sys/unix
 
 script:
-  - go build
-  - go test
+  - go build -v
+  - go test -v

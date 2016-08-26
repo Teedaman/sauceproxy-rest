@@ -467,7 +467,8 @@ func TestClientCreateWaitError(t *testing.T) {
 	}
 
 	if !(strings.HasPrefix(err.Error(), "Tunnel ") &&
-		strings.HasSuffix(err.Error(), " didn't come up after 0")) {
+		(strings.HasSuffix(err.Error(), " didn't come up after 0s")) ||
+         strings.HasSuffix(err.Error(), " didn't come up after 0")) {
 		t.Errorf("Invalid error: %s", err.Error())
 	}
 }
