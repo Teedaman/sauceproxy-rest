@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/saucelabs/sauceproxy-rest.svg?branch=add-travis-build)](https://travis-ci.org/saucelabs/sauceproxy-rest)
+
 TODO:
 
 - Implement background check goroutine in Client.Create
