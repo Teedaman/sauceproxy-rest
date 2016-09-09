@@ -527,7 +527,7 @@ func TestTunnelLoop(t *testing.T) {
 	if err != nil {
 		t.Errorf("client.createWithTimeout errored %+v\n", err)
 	}
-	go tunnel.loop(
+	go tunnel.Loop(
 		2*time.Millisecond, // Make sure status check happens before heartbeat
 		3*time.Millisecond,
 	)
@@ -587,7 +587,7 @@ func TestTunnelLoopClientStop(t *testing.T) {
 	if err != nil {
 		t.Errorf("client.createWithTimeout errored %+v\n", err)
 	}
-	go tunnel.loop(
+	go tunnel.Loop(
 		// Using the timing of the 2 loops to ensure that we get 2 heartbeats
 		// before we check if the server is up.
 		5*time.Millisecond,

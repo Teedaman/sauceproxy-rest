@@ -330,7 +330,7 @@ type Request struct {
 func (c *Client) Create(request *Request) (tunnel Tunnel, err error) {
 	tunnel, err = c.createWithTimeout(request, time.Minute)
 	if err == nil {
-		go tunnel.loop(
+		go tunnel.Loop(
 			5*time.Second,
 			30*time.Second,
 		)
@@ -441,7 +441,7 @@ type Tunnel struct {
 // Goroutine that checks if the tunnel is still up and running, and sends a
 // heart beat to indicate the tunnel client is still up.
 //
-func (t *Tunnel) loop(
+func (t *Tunnel) Loop(
 	serverStatusInterval time.Duration,
 	heartbeatInterval time.Duration,
 ) {
