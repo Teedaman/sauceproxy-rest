@@ -7,11 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"runtime"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 //
@@ -279,7 +276,7 @@ func (c *Client) shutdown(urlFmt, id string) (int, error) {
 	return jobsRunning, err
 }
 
-type jsonMetadata struct {
+type Metadata struct {
 	Release     string `json:"release"`
 	GitVersion  string `json:"git_version"`
 	Build       string `json:"build"`
@@ -290,18 +287,18 @@ type jsonMetadata struct {
 }
 
 type jsonRequest struct {
-	TunnelIdentifier *string      `json:"tunnel_identifier"`
-	DomainNames      []string     `json:"domain_names"`
-	Metadata         jsonMetadata `json:"metadata"`
-	SSHPort          int          `json:"ssh_port"`
-	NoProxyCaching   bool         `json:"no_proxy_caching"`
-	UseKGP           bool         `json:"use_kgp"`
-	FastFailRegexps  *[]string    `json:"fast_fail_regexps"`
-	DirectDomains    *[]string    `json:"direct_domains"`
-	SharedTunnel     bool         `json:"shared_tunnel"`
-	SquidConfig      *string      `json:"squid_config"`
-	VMVersion        *string      `json:"vm_version"`
-	NoSSLBumpDomains *[]string    `json:"no_ssl_bump_domains"`
+	TunnelIdentifier *string   `json:"tunnel_identifier"`
+	DomainNames      []string  `json:"domain_names"`
+	Metadata         Metadata  `json:"metadata"`
+	SSHPort          int       `json:"ssh_port"`
+	NoProxyCaching   bool      `json:"no_proxy_caching"`
+	UseKGP           bool      `json:"use_kgp"`
+	FastFailRegexps  *[]string `json:"fast_fail_regexps"`
+	DirectDomains    *[]string `json:"direct_domains"`
+	SharedTunnel     bool      `json:"shared_tunnel"`
+	SquidConfig      *string   `json:"squid_config"`
+	VMVersion        *string   `json:"vm_version"`
+	NoSSLBumpDomains *[]string `json:"no_ssl_bump_domains"`
 }
 
 //
@@ -320,7 +317,7 @@ type Request struct {
 	NoSSLBumpDomains []string
 
 	// Metadata
-	Command string
+	Metadata Metadata
 }
 
 // Create a new tunnel and wait for it to come up
@@ -349,16 +346,6 @@ func (c *Client) createWithTimeout(
 ) (
 	tunnel Tunnel, err error,
 ) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return
-	}
-	var rlimit unix.Rlimit
-	err = unix.Getrlimit(unix.RLIMIT_NOFILE, &rlimit)
-	if err != nil {
-		return
-	}
-
 	var r = request
 	var domainNames []string
 	if r.DomainNames == nil {
@@ -372,15 +359,7 @@ func (c *Client) createWithTimeout(
 	var doc = jsonRequest{
 		TunnelIdentifier: &r.TunnelIdentifier,
 		DomainNames:      domainNames,
-		Metadata: jsonMetadata{
-			Release:     "4.3.99",
-			GitVersion:  "123467",
-			Build:       "1234",
-			Platform:    "plan9",
-			Hostname:    hostname,
-			NoFileLimit: rlimit.Cur,
-			Command:     r.Command,
-		},
+		Metadata:         r.Metadata,
 		SSHPort:          r.KGPPort,
 		NoProxyCaching:   r.NoProxyCaching,
 		UseKGP:           true,
