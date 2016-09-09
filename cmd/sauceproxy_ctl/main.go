@@ -1,13 +1,13 @@
 package main
 
 import (
-	"net/http"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/jessevdk/go-flags"
 	"io"
 	"log"
+	"net/http"
 	"os"
 
 	// rest "../.."
@@ -83,7 +83,7 @@ type Options struct {
 		} `positional-args:"yes" required:"yes"`
 	} `command:"status"`
 	Find TunnelOptions `command:"find"`
-	List struct{} `command:"list"`
+	List struct{}      `command:"list"`
 }
 
 // Return the command name and the options object
@@ -116,7 +116,7 @@ func main() {
 	var command, o = ParseArguments(os.Args[1:])
 
 	var httpclient = http.Client{
-		Transport: &http.Transport{ Proxy: http.ProxyFromEnvironment },
+		Transport: &http.Transport{Proxy: http.ProxyFromEnvironment},
 	}
 	var client = rest.Client{
 		BaseURL: o.RestUrl,
@@ -141,6 +141,11 @@ func main() {
 	case "create":
 		var options = o.Create
 
+		var metadata = rest.Metadata{
+			Command: "sauceproxy-rest",
+			Release: "1.0.0",
+		}
+
 		tunnel, err := client.Create(&rest.Request{
 			TunnelIdentifier: options.TunnelIdentifier,
 			DomainNames:      options.TunnelDomains,
@@ -151,7 +156,7 @@ func main() {
 			SharedTunnel:     options.SharedTunnel,
 			VMVersion:        options.VmVersion,
 			NoSSLBumpDomains: options.NoSslBumpDomains,
-			Command:          "sauceproxy-rest",
+			Metadata:         metadata,
 		})
 		if err != nil {
 			logger.Fatalln("Unable to create tunnel:", err)
@@ -160,7 +165,7 @@ func main() {
 		fmt.Println(tunnel.Id)
 	case "shutdown":
 		var id = o.Shutdown.Arg.Id
-		err := client.Shutdown(id)
+		_, err := client.Shutdown(id)
 		if err != nil {
 			logger.Fatalln("Unable to shutdown tunnel:", err)
 		}
