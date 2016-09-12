@@ -444,8 +444,7 @@ func (t *Tunnel) heartbeatLoop(interval time.Duration) {
 // heart beat to indicate the tunnel client is still up.
 //
 func (t *Tunnel) serverStatusLoop(interval time.Duration) {
-	var termTick = time.Tick(interval)
-	for {
+	for range time.Tick(interval) {
 		var status, err = t.Status()
 		if err != nil {
 			// FIXME old sauceconnect ignores error
@@ -457,7 +456,6 @@ func (t *Tunnel) serverStatusLoop(interval time.Duration) {
 			close(t.ServerStatus)
 			return // We're done exit the loop
 		}
-		<-termTick
 	}
 }
 
