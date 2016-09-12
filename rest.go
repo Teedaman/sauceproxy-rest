@@ -326,11 +326,10 @@ type Request struct {
 // ClientStatus & ServerStatus channels
 func (c *Client) Create(request *Request) (tunnel Tunnel, err error) {
 	tunnel, err = c.createWithTimeout(request, time.Minute)
+
 	if err == nil {
-		tunnel.startLoops(
-			5*time.Second,
-			30*time.Second,
-		)
+		go t.serverStatusLoop(5*time.Second)
+		go t.heartbeatLoop(30 * time.Second)
 	}
 	return
 }
@@ -456,14 +455,6 @@ func (t *Tunnel) serverStatusLoop(interval time.Duration) {
 		}
 		<-termTick
 	}
-}
-
-func (t *Tunnel) startLoops(
-	serverStatusInterval time.Duration,
-	heartbeatInterval time.Duration,
-) {
-	go t.serverStatusLoop(serverStatusInterval)
-	go t.heartbeatLoop(heartbeatInterval)
 }
 
 // FIXME the old sauce connect makes an HTTP query and then sleep for 1
