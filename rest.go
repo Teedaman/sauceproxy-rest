@@ -426,6 +426,10 @@ func (t *Tunnel) heartbeatLoop(interval time.Duration) {
 		case clientStatus := <-t.ClientStatus:
 			connected = clientStatus.Connected
 			lastChange = time.Unix(clientStatus.LastStatusChange, 0)
+			var err = t.sendHeartBeat(connected, time.Since(lastChange))
+			if err != nil {
+				// FIXME old sauceconnect ignores error
+			}
 		case <-heartbeatTick:
 			var err = t.sendHeartBeat(connected, time.Since(lastChange))
 			if err != nil {
