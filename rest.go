@@ -328,7 +328,7 @@ func (c *Client) Create(request *Request) (tunnel Tunnel, err error) {
 	tunnel, err = c.createWithTimeout(request, time.Minute)
 
 	if err == nil {
-		go tunnel.serverStatusLoop(5*time.Second)
+		go tunnel.serverStatusLoop(5 * time.Second)
 		go tunnel.heartbeatLoop(30 * time.Second)
 	}
 	return
