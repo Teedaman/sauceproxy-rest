@@ -327,7 +327,7 @@ type Request struct {
 func (c *Client) Create(request *Request) (tunnel Tunnel, err error) {
 	tunnel, err = c.createWithTimeout(request, time.Minute)
 	if err == nil {
-		go tunnel.Loop(
+		tunnel.startLoops(
 			5*time.Second,
 			30*time.Second,
 		)
@@ -416,48 +416,54 @@ type Tunnel struct {
 	ClientStatus chan ClientStatus
 }
 
-//
-// Goroutine that checks if the tunnel is still up and running, and sends a
-// heart beat to indicate the tunnel client is still up.
-//
-func (t *Tunnel) Loop(
-	serverStatusInterval time.Duration,
-	heartbeatInterval time.Duration,
-) {
-	var termTick = time.Tick(serverStatusInterval)
-	var heartbeatTick = time.Tick(heartbeatInterval)
+func (t *Tunnel) heartbeatLoop(interval time.Duration) {
+	var heartbeatTick = time.Tick(interval)
 	// Initialize the client status before we start the status loop
-	var clientStatus ClientStatus = <-t.ClientStatus
-	var connected = clientStatus.Connected
-	var lastChange = time.Unix(clientStatus.LastStatusChange, 0)
+	var connected = false
+	var lastChange = time.Now()
 
 	for {
 		select {
-		case clientStatus = <-t.ClientStatus:
+		case clientStatus := <-t.ClientStatus:
 			connected = clientStatus.Connected
 			lastChange = time.Unix(clientStatus.LastStatusChange, 0)
-		case <-termTick:
-			var status, err = t.Status()
-			if err != nil {
-				// FIXME old sauceconnect ignores error
-			} else if status != "running" {
-				//
-				// The tunnel is down, send its status back to the main loop.
-				//
-				t.ServerStatus <- status
-				close(t.ServerStatus)
-				return // We're done exit the loop
-			}
 		case <-heartbeatTick:
-			var err = t.sendHeartBeat(
-				connected,
-				time.Since(lastChange),
-			)
+			var err = t.sendHeartBeat(connected, time.Since(lastChange))
 			if err != nil {
 				// FIXME old sauceconnect ignores error
 			}
 		}
 	}
+}
+
+//
+// Goroutine that checks if the tunnel is still up and running, and sends a
+// heart beat to indicate the tunnel client is still up.
+//
+func (t *Tunnel) serverStatusLoop(interval time.Duration) {
+	var termTick = time.Tick(interval)
+	for {
+		var status, err = t.Status()
+		if err != nil {
+			// FIXME old sauceconnect ignores error
+		} else if status != "running" {
+			//
+			// The tunnel is down, send its status back to the main loop.
+			//
+			t.ServerStatus <- status
+			close(t.ServerStatus)
+			return // We're done exit the loop
+		}
+		<-termTick
+	}
+}
+
+func (t *Tunnel) startLoops(
+	serverStatusInterval time.Duration,
+	heartbeatInterval time.Duration,
+) {
+	go t.serverStatusLoop(serverStatusInterval)
+	go t.heartbeatLoop(heartbeatInterval)
 }
 
 // FIXME the old sauce connect makes an HTTP query and then sleep for 1
@@ -533,6 +539,11 @@ func (t *Tunnel) Status() (
 	return t.Client.Status(t.Id)
 }
 
+type heartBeatRequest struct {
+	KGPConnected         bool  `json:"kgp_is_connected"`
+	StatusChangeDuration int64 `json:"kgp_seconds_since_last_status_change"`
+}
+
 func (t *Tunnel) sendHeartBeat(
 	connected bool,
 	duration time.Duration,
@@ -540,17 +551,14 @@ func (t *Tunnel) sendHeartBeat(
 	var c = t.Client
 	var url = fmt.Sprintf("%s/%s/tunnels/%s/connected", c.BaseURL, c.Username, t.Id)
 
-	var h = struct {
-		KGPConnected         bool  `json:"kgp_is_connected"`
-		StatusChangeDuration int64 `json:"kgp_seconds_since_last_status_change"`
-	}{
+	var h = heartBeatRequest{
 		KGPConnected:         connected,
 		StatusChangeDuration: int64(duration.Seconds()),
 	}
 
 	// The REST call return a JSON document like this:
 	//
-	//	  {"result": true, "id", "<tunnel id>"}
+	//        {"result": true, "id", "<tunnel id>"}
 	//
 	// We don't decode it since it doesn't give us any useful information to
 	// return.
