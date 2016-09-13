@@ -78,8 +78,8 @@ func multiResponseServer(responses []R) *httptest.Server {
 	var index = 0
 	return httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			responses[index](w, r)
 			if index < len(responses) {
+				responses[index](w, r)
 				index += 1
 			}
 		}))
@@ -519,8 +519,6 @@ func TestTunnelLoop(t *testing.T) {
 	var server = multiResponseServer([]R{
 		stringResponse(createJSON),
 		stringResponse(statusRunningJSON),
-		stringResponse(statusRunningJSON),
-		stringResponse(`{"result": true, "tunnel_id": "fakeid"}`),
 		stringResponse(`{"status": "shutdown", "user_shutdown": null}`),
 	})
 
@@ -528,15 +526,7 @@ func TestTunnelLoop(t *testing.T) {
 	if err != nil {
 		t.Errorf("client.createWithTimeout errored %+v\n", err)
 	}
-	go tunnel.Loop(
-		2*time.Millisecond, // Make sure status check happens before heartbeat
-		3*time.Millisecond,
-	)
-	// Notify the Tunnel object that KGP is "up"
-	tunnel.ClientStatus <- ClientStatus{
-		Connected:        true,
-		LastStatusChange: 0,
-	}
+	go tunnel.serverStatusLoop(time.Millisecond)
 
 	var serverStatus = <-tunnel.ServerStatus
 	if serverStatus != "shutdown" {
@@ -554,10 +544,7 @@ func heartbeatChecker(
 	t *testing.T,
 ) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var h struct {
-			KGPConnected         bool  `json:"kgp_is_connected"`
-			StatusChangeDuration int64 `json:"kgp_seconds_since_last_status_change"`
-		}
+		var h heartBeatRequest
 		if err := decodeJSON(r.Body, &h); err != nil {
 			t.Errorf("decodeJSON errored %+v\n", err)
 		}
@@ -581,35 +568,25 @@ func TestTunnelLoopClientStop(t *testing.T) {
 		stringResponse(statusRunningJSON),
 		heartbeatChecker(true, 1, t),
 		heartbeatChecker(false, 0, t),
-		stringResponse(`{"status": "shutdown", "user_shutdown": null}`),
 	})
 
 	tunnel, err := createTunnel(server.URL)
 	if err != nil {
 		t.Errorf("client.createWithTimeout errored %+v\n", err)
 	}
-	go tunnel.Loop(
-		// Using the timing of the 2 loops to ensure that we get 2 heartbeats
-		// before we check if the server is up.
-		5*time.Millisecond,
-		2*time.Millisecond,
-	)
+
 	var now = time.Now()
 	var before = now.Add(-1 * time.Second)
+	go tunnel.heartbeatLoop(time.Millisecond)
 	// Notify the Tunnel object that KGP is "up"
 	tunnel.ClientStatus <- ClientStatus{
 		Connected:        true,
 		LastStatusChange: before.Unix(),
 	}
-	time.Sleep(3 * time.Millisecond) // Make sure the request was handled
+
 	// Notify the tunnel the KGP went "down"
 	tunnel.ClientStatus <- ClientStatus{
 		Connected:        false,
 		LastStatusChange: now.Unix(),
-	}
-
-	var serverStatus = <-tunnel.ServerStatus
-	if serverStatus != "shutdown" {
-		t.Errorf("Invalid server status %+v\n", serverStatus)
 	}
 }
