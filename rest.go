@@ -416,7 +416,7 @@ type Tunnel struct {
 }
 
 func (t *Tunnel) heartbeatLoop(interval time.Duration) {
-	var heartbeatTick = time.Tick(interval)
+	var heartbeatTicker = time.NewTicker(interval)
 	// Initialize the client status before we start the status loop
 	var connected = false
 	var lastChange = time.Now()
@@ -430,7 +430,7 @@ func (t *Tunnel) heartbeatLoop(interval time.Duration) {
 			if err != nil {
 				// FIXME old sauceconnect ignores error
 			}
-		case <-heartbeatTick:
+		case <-heartbeatTicker.C:
 			var err = t.sendHeartBeat(connected, time.Since(lastChange))
 			if err != nil {
 				// FIXME old sauceconnect ignores error
@@ -444,7 +444,7 @@ func (t *Tunnel) heartbeatLoop(interval time.Duration) {
 // heart beat to indicate the tunnel client is still up.
 //
 func (t *Tunnel) serverStatusLoop(interval time.Duration) {
-	for range time.Tick(interval) {
+	for range time.NewTicker(interval).C {
 		var status, err = t.Status()
 		if err != nil {
 			// FIXME old sauceconnect ignores error
