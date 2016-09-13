@@ -166,6 +166,8 @@ func (c *Client) executeRequest(
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(c.Username, c.Password)
 
 	var client = c.Client
