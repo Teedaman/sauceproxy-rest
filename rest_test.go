@@ -575,16 +575,15 @@ func TestTunnelLoopClientStop(t *testing.T) {
 		t.Errorf("client.createWithTimeout errored %+v\n", err)
 	}
 
-	go tunnel.heartbeatLoop(0)
 	var now = time.Now()
 	var before = now.Add(-1 * time.Second)
+	go tunnel.heartbeatLoop(time.Millisecond)
 	// Notify the Tunnel object that KGP is "up"
 	tunnel.ClientStatus <- ClientStatus{
 		Connected:        true,
 		LastStatusChange: before.Unix(),
 	}
 
-	time.Sleep(time.Millisecond) // Make sure the request was handled
 	// Notify the tunnel the KGP went "down"
 	tunnel.ClientStatus <- ClientStatus{
 		Connected:        false,
