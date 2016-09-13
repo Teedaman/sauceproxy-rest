@@ -442,8 +442,7 @@ func (t *Tunnel) heartbeatLoop(interval time.Duration) {
 }
 
 //
-// Goroutine that checks if the tunnel is still up and running, and sends a
-// heart beat to indicate the tunnel client is still up.
+// Goroutine that checks if the tunnel is still up and running
 //
 func (t *Tunnel) serverStatusLoop(interval time.Duration) {
 	for range time.NewTicker(interval).C {
