@@ -284,7 +284,7 @@ type Metadata struct {
 	Build       string `json:"build"`
 	Platform    string `json:"platform"`
 	Hostname    string `json:"hostname"`
-	NoFileLimit uint64 `json:"no_file_limit"`
+	NoFileLimit uint64 `json:"nofile_limit"`
 	Command     string `json:"command"`
 }
 
