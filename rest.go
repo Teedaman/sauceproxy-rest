@@ -194,7 +194,7 @@ func (c *Client) executeRequest(
 
 type tunnelState struct {
 	Id               string   `json:"id"`
-	TunnelIdentifier string   `json:"tunnel_id"`
+	TunnelIdentifier string   `json:"tunnel_identifier"`
 	DomainNames      []string `json:"domain_names"`
 }
 

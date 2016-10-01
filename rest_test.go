@@ -318,6 +318,41 @@ func TestClientFindDuplicate(t *testing.T) {
 	}
 }
 
+func TestFindBugScClient(t *testing.T) {
+	const tunnelsJSON = `[{
+		"status": "running",
+		"tunnel_identifier": "sauce",
+		"user_shutdown": false,
+		"id": "709b9c76afee3bfef42f1a9baaa5002abf6b00a9",
+		"domain_names": ["sauce-connect.proxy"]}]`
+
+	var server = multiResponseServer([]R{
+		stringResponse(tunnelsJSON),
+	})
+	defer server.Close()
+
+	var client = Client{
+		BaseURL:  server.URL,
+		Username: "username",
+		Password: "password",
+	}
+
+	var matches, err = client.Find("sauce", []string{})
+
+	if err != nil {
+		t.Errorf("client.Find errored: %s", err)
+	}
+
+	for _, m := range matches {
+		if m != "709b9c76afee3bfef42f1a9baaa5002abf6b00a9" {
+			t.Errorf(
+				"%v != %v\n", m,
+				"709b9c76afee3bfef42f1a9baaa5002abf6b00a9",
+			)
+		}
+	}
+}
+
 func TestClientShutdown(t *testing.T) {
 	var server = multiResponseServer([]R{
 		stringResponse("{ \"jobs_running\": 0 }"),
