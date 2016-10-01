@@ -336,8 +336,6 @@ func (c *Client) Create(request *Request) (tunnel Tunnel, err error) {
 	return
 }
 
-const DefaultDomain = "sauce-connect.proxy"
-
 //
 // Create a new tunnel and wait for it to come up within `wait`.
 //
@@ -348,18 +346,10 @@ func (c *Client) createWithTimeout(
 	tunnel Tunnel, err error,
 ) {
 	var r = request
-	var domainNames []string
-	if r.DomainNames == nil {
-		if r.TunnelIdentifier == "" {
-			domainNames = []string{DefaultDomain}
-		}
-	} else {
-		domainNames = r.DomainNames
-	}
 
 	var doc = jsonRequest{
 		TunnelIdentifier: &r.TunnelIdentifier,
-		DomainNames:      domainNames,
+		DomainNames:      r.DomainNames,
 		Metadata:         r.Metadata,
 		SSHPort:          r.KGPPort,
 		NoProxyCaching:   r.NoProxyCaching,
