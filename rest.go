@@ -374,8 +374,7 @@ func (c *Client) createWithTimeout(
 
 	tunnel.Client = c
 	tunnel.Id = response.Id
-	tunnel.Host = response.Host
-	err = tunnel.wait(timeout)
+	tunnel.Host, err = tunnel.wait(timeout)
 	// Only create channels if the tunnel succesfully come up
 	if err == nil {
 		tunnel.ServerStatus = make(chan string)
@@ -455,25 +454,28 @@ func (t *Tunnel) serverStatusLoop(interval time.Duration) {
 // seconds + 60 * time the HTTP roundtrip.
 //
 // Wait for the tunnel to run
-func (t *Tunnel) wait(timeout time.Duration) error {
+func (t *Tunnel) wait(timeout time.Duration) (
+	host string,
+	err error,
+) {
 	var now = time.Now()
 	var end = now.Add(timeout)
 
 	for !now.After(end) {
-		status, err := t.Status()
+		status, err := t.Client.status(t.Id)
 		if err != nil {
-			return err
+			return "", err
 		}
 
-		if status == "running" {
-			return nil
+		if status.Status == "running" {
+			return status.Host, nil
 		} else {
 			time.Sleep(time.Second)
 		}
 		now = time.Now()
 	}
 
-	return fmt.Errorf(
+	return "", fmt.Errorf(
 		"Tunnel %s didn't come up after %s",
 		t.Id, timeout.String())
 }
@@ -486,6 +488,19 @@ func (t *Tunnel) ShutdownWaitForJobs() (int, error) {
 	return t.Client.shutdown("%s/%s/tunnels/%s?wait_for_jobs=1", t.Id)
 }
 
+type serverStatus struct {
+	Status       string `json:"status"`
+	UserShutdown *bool  `json:"user_shutdown"`
+	Host		string `json:"host"`
+}
+
+func (c *Client) status(id string) (status serverStatus, err error) {
+	var url = fmt.Sprintf("%s/%s/tunnels/%s", c.BaseURL, c.Username, id)
+
+	err = c.executeRequest("GET", url, nil, &status)
+	return
+}
+
 //
 // status can have the values:
 // - "running" the tunnel is up and running
@@ -496,14 +511,7 @@ func (t *Tunnel) ShutdownWaitForJobs() (int, error) {
 func (c *Client) Status(id string) (
 	status string, err error,
 ) {
-	var url = fmt.Sprintf("%s/%s/tunnels/%s", c.BaseURL, c.Username, id)
-
-	var s struct {
-		Status       string `json:"status"`
-		UserShutdown *bool  `json:"user_shutdown"`
-	}
-
-	err = c.executeRequest("GET", url, nil, &s)
+	s, err := c.status(id)
 	if err != nil {
 		return
 	}
