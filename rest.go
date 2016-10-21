@@ -491,7 +491,7 @@ func (t *Tunnel) ShutdownWaitForJobs() (int, error) {
 type serverStatus struct {
 	Status       string `json:"status"`
 	UserShutdown *bool  `json:"user_shutdown"`
-	Host		string `json:"host"`
+	Host         string `json:"host"`
 }
 
 func (c *Client) status(id string) (status serverStatus, err error) {
