@@ -301,6 +301,7 @@ type jsonRequest struct {
 	SquidConfig      *string   `json:"squid_config"`
 	VMVersion        *string   `json:"vm_version"`
 	NoSSLBumpDomains *[]string `json:"no_ssl_bump_domains"`
+	ExtraInfo        *string   `json:"extra_info"`
 }
 
 //
@@ -320,6 +321,10 @@ type Request struct {
 
 	// Metadata
 	Metadata Metadata
+
+	// Extra info. This is a string (which contains a JSON dict) to enable
+	// optional features and flags.
+	ExtraInfo string
 }
 
 // Create a new tunnel and wait for it to come up
@@ -360,6 +365,7 @@ func (c *Client) createWithTimeout(
 		SquidConfig:      nil,
 		VMVersion:        &r.VMVersion,
 		NoSSLBumpDomains: &r.NoSSLBumpDomains,
+		ExtraInfo:        &r.ExtraInfo,
 	}
 	var response struct {
 		Id   string `json:"id"`
