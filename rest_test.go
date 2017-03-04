@@ -522,9 +522,9 @@ func TestTunnelHeartBeat(t *testing.T) {
 		t.Errorf("client.createWithTimeout errored %+v\n", err)
 	}
 
-	err = tunnel.sendHeartBeat(true, time.Hour)
+	err = tunnel.Client.Ping(tunnel.Id, true, time.Hour)
 	if err != nil {
-		t.Errorf("tunnel.sendHeartBeat errored %+v\n", err)
+		t.Errorf("Client.Ping errored %+v\n", err)
 	}
 }
 
@@ -540,9 +540,9 @@ func TestTunnelHeartBeatError(t *testing.T) {
 	}
 
 	server.Close()
-	err = tunnel.sendHeartBeat(true, time.Hour)
+	err = tunnel.Client.Ping(tunnel.Id, true, time.Hour)
 	if err == nil {
-		t.Errorf("tunnel.sendHeartBeat didn't error\n")
+		t.Errorf("Client.Ping didn't error\n")
 	}
 	if !strings.HasPrefix(err.Error(), "couldn't connect to ") {
 		t.Errorf("Invalid error: %s", err.Error())

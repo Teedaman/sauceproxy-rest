@@ -423,12 +423,12 @@ func (t *Tunnel) heartbeatLoop(interval time.Duration) {
 		case clientStatus := <-t.ClientStatus:
 			connected = clientStatus.Connected
 			lastChange = time.Unix(clientStatus.LastStatusChange, 0)
-			var err = t.sendHeartBeat(connected, time.Since(lastChange))
+			var err = t.Client.Ping(t.Id, connected, time.Since(lastChange))
 			if err != nil {
 				// FIXME old sauceconnect ignores error
 			}
 		case <-heartbeatTicker.C:
-			var err = t.sendHeartBeat(connected, time.Since(lastChange))
+			var err = t.Client.Ping(t.Id, connected, time.Since(lastChange))
 			if err != nil {
 				// FIXME old sauceconnect ignores error
 			}
@@ -464,10 +464,9 @@ func (t *Tunnel) wait(timeout time.Duration) (
 	host string,
 	err error,
 ) {
-	var now = time.Now()
-	var end = now.Add(timeout)
+	var end = time.Now().Add(timeout)
 
-	for !now.After(end) {
+	for {
 		status, err := t.Client.status(t.Id)
 		if err != nil {
 			return "", err
@@ -475,10 +474,13 @@ func (t *Tunnel) wait(timeout time.Duration) (
 
 		if status.Status == "running" {
 			return status.Host, nil
+		}
+
+		if time.Now().After(end) {
+			break
 		} else {
 			time.Sleep(time.Second)
 		}
-		now = time.Now()
 	}
 
 	return "", fmt.Errorf(
@@ -542,12 +544,15 @@ type heartBeatRequest struct {
 	StatusChangeDuration int64 `json:"kgp_seconds_since_last_status_change"`
 }
 
-func (t *Tunnel) sendHeartBeat(
+//
+// Send a heartbeat for tunnel `id`
+//
+func (c *Client)Ping(
+	id string,
 	connected bool,
 	duration time.Duration,
 ) error {
-	var c = t.Client
-	var url = fmt.Sprintf("%s/%s/tunnels/%s/connected", c.BaseURL, c.Username, t.Id)
+	var url = fmt.Sprintf("%s/%s/tunnels/%s/connected", c.BaseURL, c.Username, id)
 
 	var h = heartBeatRequest{
 		KGPConnected:         connected,
@@ -559,13 +564,7 @@ func (t *Tunnel) sendHeartBeat(
 	//        {"result": true, "id", "<tunnel id>"}
 	//
 	// We don't decode it since it doesn't give us any useful information to
-	// return.
-	//
-	// FIXME it looks like result is always true looking at the Resto code
-	err := c.executeRequest("POST", url, &h, nil)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	// return. It looks like result is always true looking at the REST backend
+	// code.
+	return c.executeRequest("POST", url, &h, nil)
 }

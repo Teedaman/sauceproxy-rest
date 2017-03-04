@@ -1,6 +1,7 @@
 package main
 
 import (
+	"time"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -58,7 +59,7 @@ func verboseDecodeJSON(reader io.ReadCloser, v interface{}) error {
 func verboseEncodeJSON(w io.Writer, v interface{}) error {
 	var buf bytes.Buffer
 	var err = json.NewEncoder(&buf).Encode(v)
-	logger.Println("request:", buf, "\n")
+	logger.Println("request:", buf.String(), "\n")
 	io.Copy(w, &buf)
 	if err != nil {
 		return fmt.Errorf("couldn't encode JSON document: %s", err)
@@ -83,6 +84,13 @@ type Options struct {
 	} `command:"status"`
 	Find TunnelOptions `command:"find"`
 	List struct{}      `command:"list"`
+	Ping struct{
+		Arg struct {
+			Id string `description:"Tunnel ID (not tunnel identifier)"`
+		} `positional-args:"yes" required:"yes"`
+		Connected bool `description:"state of the KGP connection"`
+		Duration  time.Duration `description:"time since last state change"`
+	} `command:"ping"`
 }
 
 // Return the command name and the options object
@@ -192,6 +200,13 @@ func main() {
 		}
 		for _, id := range matches {
 			fmt.Println(id)
+		}
+	case "ping":
+		var id = o.Ping.Arg.Id
+		var connected = o.Ping.Connected
+		var duration = o.Ping.Duration
+		if err := client.Ping(id, connected, duration); err != nil {
+			log.Fatalln(err)
 		}
 	default:
 		logger.Fatalln("unknown command:", command)
