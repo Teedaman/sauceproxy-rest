@@ -91,6 +91,11 @@ type Options struct {
 		Connected bool `description:"state of the KGP connection"`
 		Duration  time.Duration `description:"time since last state change"`
 	} `command:"ping"`
+	KgpHost struct {
+		Arg struct {
+			Id string `description:"Tunnel ID (not tunnel identifier)"`
+		} `positional-args:"yes" required:"yes"`
+	} `command:"kgp_host"`
 }
 
 // Return the command name and the options object
@@ -207,6 +212,13 @@ func main() {
 		var duration = o.Ping.Duration
 		if err := client.Ping(id, connected, duration); err != nil {
 			log.Fatalln(err)
+		}
+	case "kgp_host":
+		var id = o.KgpHost.Arg.Id
+		if host, err := client.KgpHost(id); err != nil {
+			log.Fatalln(err)
+		} else {
+			fmt.Println(host)
 		}
 	default:
 		logger.Fatalln("unknown command:", command)

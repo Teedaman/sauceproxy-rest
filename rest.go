@@ -533,6 +533,15 @@ func (c *Client) Status(id string) (
 	return
 }
 
+func (c *Client) KgpHost(id string) (string, error) {
+	var s, err = c.status(id)
+	if err != nil {
+		return "", err
+	}
+
+	return s.Host, nil
+}
+
 func (t *Tunnel) Status() (
 	status string, err error,
 ) {
