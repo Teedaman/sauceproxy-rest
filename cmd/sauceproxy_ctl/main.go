@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"os"
 
-	rest "../.."
+	rest "github.com/saucelabs/sauceproxy-rest"
 )
 
 type CommonOptions struct {
