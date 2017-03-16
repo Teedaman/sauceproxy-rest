@@ -6,7 +6,9 @@ go:
 
 install:
   - go get golang.org/x/sys/unix
+  - go get github.com/jessevdk/go-flags
 
 script:
   - go build -v
   - go test -v
+  - (cd cmd/sauceproxy_ctl; go build -v .)
