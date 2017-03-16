@@ -10,3 +10,4 @@ install:
 script:
   - go build -v
   - go test -v
+  - (cd cmd/sauceproxy_ctl; go build -v .)
