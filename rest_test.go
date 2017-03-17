@@ -456,7 +456,7 @@ func createTunnel(url string) (Tunnel, error) {
 	var request = Request{
 		DomainNames: []string{"sauce-connect.proxy"},
 	}
-	return client.createWithTimeout(&request, 0)
+	return client.CreateWithTimeout(&request, 0)
 }
 
 func TestClientCreate(t *testing.T) {
