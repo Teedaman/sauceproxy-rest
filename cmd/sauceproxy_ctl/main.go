@@ -1,17 +1,17 @@
 package main
 
 import (
-	"time"
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/jessevdk/go-flags"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
-	rest "github.com/saucelabs/sauceproxy-rest"
+	"github.com/jessevdk/go-flags"
+	"github.com/saucelabs/sauceproxy-rest"
 )
 
 type CommonOptions struct {
@@ -30,13 +30,14 @@ type TunnelOptions struct {
 type CreateOptions struct {
 	TunnelOptions
 
-	DirectDomains    []string `short:"D" long:"direct-domains" value-name:"<...>" description:"Comma-separated list of domains. Requests whose host matches one of these will be relayed directly through the internet, instead of through the tunnel."`
-	NoProxyCaching   bool     `short:"N" long:"no-proxy-caching" description:"Disable caching in Sauce Connect. All requests will be sent through the tunnel."`
-	KgpPort          int      `long:"kgp-port" hidden:"true" default:"443"`
-	FastFailRegexps  []string `short:"F" long:"fast-fail-regexps" value-name:"<...>" description:"Comma-separated list of regular expressions. Requests matching one of these will get dropped instantly and will not go through the tunnel."`
-	SharedTunnel     bool     `short:"s" long:"shared-tunnel" description:"Let sub-accounts of the tunnel owner use the tunnel if requested."`
-	VmVersion        string   `long:"vm-version" value-name:"<version>" description:"Request a specific tunnel VM version."`
-	NoSslBumpDomains []string `short:"B" long:"no-ssl-bump-domains" value-name:"<...>" description:"Comma-separated list of domains. Requests whose host matches one of these will not be SSL re-encrypted."`
+	DirectDomains    []string      `short:"D" long:"direct-domains" value-name:"<...>" description:"Comma-separated list of domains. Requests whose host matches one of these will be relayed directly through the internet, instead of through the tunnel."`
+	NoProxyCaching   bool          `short:"N" long:"no-proxy-caching" description:"Disable caching in Sauce Connect. All requests will be sent through the tunnel."`
+	KgpPort          int           `long:"kgp-port" hidden:"true" default:"443"`
+	FastFailRegexps  []string      `short:"F" long:"fast-fail-regexps" value-name:"<...>" description:"Comma-separated list of regular expressions. Requests matching one of these will get dropped instantly and will not go through the tunnel."`
+	SharedTunnel     bool          `short:"s" long:"shared-tunnel" description:"Let sub-accounts of the tunnel owner use the tunnel if requested."`
+	VmVersion        string        `long:"vm-version" value-name:"<version>" description:"Request a specific tunnel VM version."`
+	NoSslBumpDomains []string      `short:"B" long:"no-ssl-bump-domains" value-name:"<...>" description:"Comma-separated list of domains. Requests whose host matches one of these will not be SSL re-encrypted."`
+	Timeout          time.Duration `long:"timeout" description:"Timeout (example: 10, 10s 1m, or 1h)"`
 }
 
 //
@@ -84,11 +85,11 @@ type Options struct {
 	} `command:"status"`
 	Find TunnelOptions `command:"find"`
 	List struct{}      `command:"list"`
-	Ping struct{
+	Ping struct {
 		Arg struct {
 			Id string `description:"Tunnel ID (not tunnel identifier)"`
 		} `positional-args:"yes" required:"yes"`
-		Connected bool `description:"state of the KGP connection"`
+		Connected bool          `description:"state of the KGP connection"`
 		Duration  time.Duration `description:"time since last state change"`
 	} `command:"ping"`
 	KgpHost struct {
@@ -158,18 +159,26 @@ func main() {
 			Release: "1.0.0",
 		}
 
-		tunnel, err := client.Create(&rest.Request{
-			TunnelIdentifier: options.TunnelIdentifier,
-			DomainNames:      options.TunnelDomains,
-			DirectDomains:    options.DirectDomains,
-			KGPPort:          options.KgpPort,
-			NoProxyCaching:   options.NoProxyCaching,
-			FastFailRegexps:  options.FastFailRegexps,
-			SharedTunnel:     options.SharedTunnel,
-			VMVersion:        options.VmVersion,
-			NoSSLBumpDomains: options.NoSslBumpDomains,
-			Metadata:         metadata,
-		})
+		var timeout = options.Timeout
+		if timeout == 0 {
+			timeout = time.Minute
+		}
+
+		tunnel, err := client.CreateWithTimeout(
+			&rest.Request{
+				TunnelIdentifier: options.TunnelIdentifier,
+				DomainNames:      options.TunnelDomains,
+				DirectDomains:    options.DirectDomains,
+				KGPPort:          options.KgpPort,
+				NoProxyCaching:   options.NoProxyCaching,
+				FastFailRegexps:  options.FastFailRegexps,
+				SharedTunnel:     options.SharedTunnel,
+				VMVersion:        options.VmVersion,
+				NoSSLBumpDomains: options.NoSslBumpDomains,
+				Metadata:         metadata,
+			},
+			timeout,
+		)
 		if err != nil {
 			logger.Fatalln("Unable to create tunnel:", err)
 		}

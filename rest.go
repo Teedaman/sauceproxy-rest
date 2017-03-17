@@ -332,7 +332,7 @@ type Request struct {
 // This will start a goroutine to keep track of the tunnel's status using the
 // ClientStatus & ServerStatus channels
 func (c *Client) Create(request *Request) (tunnel Tunnel, err error) {
-	tunnel, err = c.createWithTimeout(request, time.Minute)
+	tunnel, err = c.CreateWithTimeout(request, time.Minute)
 
 	if err == nil {
 		go tunnel.serverStatusLoop(5 * time.Second)
@@ -344,7 +344,7 @@ func (c *Client) Create(request *Request) (tunnel Tunnel, err error) {
 //
 // Create a new tunnel and wait for it to come up within `wait`.
 //
-func (c *Client) createWithTimeout(
+func (c *Client) CreateWithTimeout(
 	request *Request,
 	timeout time.Duration,
 ) (
@@ -556,7 +556,7 @@ type heartBeatRequest struct {
 //
 // Send a heartbeat for tunnel `id`
 //
-func (c *Client)Ping(
+func (c *Client) Ping(
 	id string,
 	connected bool,
 	duration time.Duration,
