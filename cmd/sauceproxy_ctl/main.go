@@ -89,8 +89,8 @@ type Options struct {
 		Arg struct {
 			Id string `description:"Tunnel ID (not tunnel identifier)"`
 		} `positional-args:"yes" required:"yes"`
-		Connected bool          `description:"state of the KGP connection"`
-		Duration  time.Duration `description:"time since last state change"`
+		Connected bool          `short:"c" description:"Set connected flag"`
+		Duration  time.Duration `short:"d" description:"time since last state change"`
 	} `command:"ping"`
 	KgpHost struct {
 		Arg struct {
