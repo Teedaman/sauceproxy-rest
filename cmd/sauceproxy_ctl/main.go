@@ -156,7 +156,7 @@ func main() {
 
 		var metadata = rest.Metadata{
 			Command: "sauceproxy-rest",
-			Release: "1.0.0",
+			Release: "10.0.0",
 		}
 
 		var timeout = options.Timeout
