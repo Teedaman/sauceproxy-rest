@@ -46,7 +46,7 @@ type Client struct {
 	// Methods to override default functionality
 	DecodeJSON func(reader io.ReadCloser, v interface{}) error
 	EncodeJSON func(writer io.Writer, v interface{}) error
-	LogFunction func(url string)
+	LogFunction func(prefix string, msg string, logLevel int)
 }
 
 //
@@ -146,9 +146,9 @@ func (c *Client) encode(writer io.Writer, v interface{}) error {
 	}
 }
 
-func (c *Client) writeToLog(msg string) {
+func (c *Client) writeToLog(prefix string, msg string, logLevel int) {
 	if c.LogFunction != nil {
-		c.LogFunction(msg)
+		c.LogFunction(prefix, msg, logLevel)
 	}
 }
 
