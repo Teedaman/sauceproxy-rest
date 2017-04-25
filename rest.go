@@ -178,7 +178,7 @@ func (c *Client) executeRequest(
 	req.SetBasicAuth(c.Username, c.Password)
 
 	var client = c.Client
-	c.writeToLog("REST request: " + url)
+	c.writeToLog("REST request: ", url, 0)
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("couldn't connect to %s: %s", req.URL, err)
@@ -191,12 +191,12 @@ func (c *Client) executeRequest(
 			req.URL,
 			resp.Status)
 	}
-	c.writeToLog(fmt.Sprintf("HTTP Response: %s was %d \n", url, resp.StatusCode))
+	c.writeToLog("HTTP Response: ", fmt.Sprintf("was %d \n", url, resp.StatusCode), 0)
 
 	// Decode response if needed
 	if response != nil {
 		err = c.decode(resp.Body, response)
-		c.writeToLog(fmt.Sprintf("REST response: %+v", response))
+		c.writeToLog(fmt.Sprintf("REST response: " fmt.Sprintf("%+v", response), 0)
 		return err
 	}
 
