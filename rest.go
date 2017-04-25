@@ -196,7 +196,7 @@ func (c *Client) executeRequest(
 	// Decode response if needed
 	if response != nil {
 		err = c.decode(resp.Body, response)
-		c.writeToLog(fmt.Sprintf("REST response: " fmt.Sprintf("%+v", response), 0)
+		c.writeToLog(fmt.Sprintf("REST response: ", fmt.Sprintf("%+v", response), 0)
 		return err
 	}
 
