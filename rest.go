@@ -43,9 +43,10 @@ type Client struct {
 
 	Client http.Client
 
-	// Methods to override the default decoding function
+	// Methods to override default functionality
 	DecodeJSON func(reader io.ReadCloser, v interface{}) error
 	EncodeJSON func(writer io.Writer, v interface{}) error
+	LogFunction func(prefix string, msg string, logLevel int)
 }
 
 //
@@ -145,6 +146,12 @@ func (c *Client) encode(writer io.Writer, v interface{}) error {
 	}
 }
 
+func (c *Client) writeToLog(prefix string, msg string, logLevel int) {
+	if c.LogFunction != nil {
+		c.LogFunction(prefix, msg, logLevel)
+	}
+}
+
 //
 // Execute HTTP request and return an io.ReadCloser to be decoded
 //
@@ -171,6 +178,7 @@ func (c *Client) executeRequest(
 	req.SetBasicAuth(c.Username, c.Password)
 
 	var client = c.Client
+	c.writeToLog("REST request: ", url, 0)
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("couldn't connect to %s: %s", req.URL, err)
@@ -183,10 +191,13 @@ func (c *Client) executeRequest(
 			req.URL,
 			resp.Status)
 	}
+	c.writeToLog("HTTP Response: ", fmt.Sprintf("was %d \n", url, resp.StatusCode), 0)
 
 	// Decode response if needed
 	if response != nil {
-		return c.decode(resp.Body, response)
+		err = c.decode(resp.Body, response)
+		c.writeToLog("REST response: ", fmt.Sprintf("%+v", response), 0)
+		return err
 	}
 
 	return nil
