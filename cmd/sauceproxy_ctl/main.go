@@ -40,6 +40,14 @@ type CreateOptions struct {
 	Timeout          time.Duration `long:"timeout" description:"Timeout (example: 10, 10s 1m, or 1h)"`
 }
 
+type PingOptions struct {
+	Arg struct {
+		Id string `description:"Tunnel ID (not tunnel identifier)"`
+	} `positional-args:"yes" required:"yes"`
+	Connected bool          `short:"c" description:"Set connected flag"`
+	Duration  time.Duration `short:"d" description:"time since last state change"`
+}
+
 //
 // Decode `reader` into the object `v`, and close `reader` after.
 //
@@ -85,13 +93,11 @@ type Options struct {
 	} `command:"status"`
 	Find TunnelOptions `command:"find"`
 	List struct{}      `command:"list"`
-	Ping struct {
-		Arg struct {
-			Id string `description:"Tunnel ID (not tunnel identifier)"`
-		} `positional-args:"yes" required:"yes"`
-		Connected bool          `short:"c" description:"Set connected flag"`
-		Duration  time.Duration `short:"d" description:"time since last state change"`
-	} `command:"ping"`
+	Ping PingOptions   `command:"ping"`
+	Keepalive struct {
+		PingOptions
+		Period	time.Duration `short:"p" description:"period between keepalive" default:"30s"`
+	} `command:"keepalive"`
 	KgpHost struct {
 		Arg struct {
 			Id string `description:"Tunnel ID (not tunnel identifier)"`
@@ -107,9 +113,11 @@ func ParseArguments(args []string) (command string, options Options) {
 	extra, err := parser.ParseArgs(args)
 
 	if err != nil {
-		// FIXME go-flags outputs the error in stderr in some cases, check it
-		// does it for all errors
-		os.Exit(1)
+		if flagsErr, ok := err.(*flags.Error); ok && flagsErr.Type == flags.ErrHelp {
+			os.Exit(0)
+		} else {
+			os.Exit(1)
+		}
 	}
 	if len(extra) != 0 {
 		logger.Fatalln("Extra arguments:", extra)
@@ -221,6 +229,20 @@ func main() {
 		var duration = o.Ping.Duration
 		if err := client.Ping(id, connected, duration); err != nil {
 			log.Fatalln(err)
+		}
+	case "keepalive":
+		var id = o.Keepalive.Arg.Id
+		var connected = o.Keepalive.Connected
+		var duration = o.Keepalive.Duration
+		var ticker = time.NewTicker(o.Keepalive.Period)
+
+		for {
+			select {
+			case <-ticker.C:
+				if err := client.Ping(id, connected, duration); err != nil {
+					log.Fatalln(err)
+				}
+			}
 		}
 	case "kgp_host":
 		var id = o.KgpHost.Arg.Id
