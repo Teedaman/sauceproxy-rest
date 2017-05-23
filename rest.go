@@ -184,8 +184,9 @@ func (c *Client) executeRequest(
 		return fmt.Errorf("couldn't connect to %s: %s", req.URL, err)
 	}
 
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
 		return fmt.Errorf(
 			"error querying from %s. HTTP status: %s",
 			req.URL,
