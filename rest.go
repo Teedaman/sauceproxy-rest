@@ -44,8 +44,8 @@ type Client struct {
 	Client http.Client
 
 	// Methods to override default functionality
-	DecodeJSON func(reader io.ReadCloser, v interface{}) error
-	EncodeJSON func(writer io.Writer, v interface{}) error
+	DecodeJSON  func(reader io.ReadCloser, v interface{}) error
+	EncodeJSON  func(writer io.Writer, v interface{}) error
 	LogFunction func(prefix string, msg string, logLevel int)
 }
 
