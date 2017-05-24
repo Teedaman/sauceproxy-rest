@@ -44,8 +44,8 @@ type Client struct {
 	Client http.Client
 
 	// Methods to override default functionality
-	DecodeJSON func(reader io.ReadCloser, v interface{}) error
-	EncodeJSON func(writer io.Writer, v interface{}) error
+	DecodeJSON  func(reader io.ReadCloser, v interface{}) error
+	EncodeJSON  func(writer io.Writer, v interface{}) error
 	LogFunction func(prefix string, msg string, logLevel int)
 }
 
@@ -184,8 +184,9 @@ func (c *Client) executeRequest(
 		return fmt.Errorf("couldn't connect to %s: %s", req.URL, err)
 	}
 
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
 		return fmt.Errorf(
 			"error querying from %s. HTTP status: %s",
 			req.URL,
