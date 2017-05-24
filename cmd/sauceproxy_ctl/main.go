@@ -37,6 +37,7 @@ type CreateOptions struct {
 	SharedTunnel     bool          `short:"s" long:"shared-tunnel" description:"Let sub-accounts of the tunnel owner use the tunnel if requested."`
 	VmVersion        string        `long:"vm-version" value-name:"<version>" description:"Request a specific tunnel VM version."`
 	NoSslBumpDomains []string      `short:"B" long:"no-ssl-bump-domains" value-name:"<...>" description:"Comma-separated list of domains. Requests whose host matches one of these will not be SSL re-encrypted."`
+	ExtraInfo		 string        `long:"extra-info" description:"JSON document to with extra feature flags"`
 	Timeout          time.Duration `long:"timeout" description:"Timeout (example: 10, 10s 1m, or 1h)"`
 }
 
@@ -183,6 +184,7 @@ func main() {
 				SharedTunnel:     options.SharedTunnel,
 				VMVersion:        options.VmVersion,
 				NoSSLBumpDomains: options.NoSslBumpDomains,
+				ExtraInfo:		  options.ExtraInfo,
 				Metadata:         metadata,
 			},
 			timeout,
