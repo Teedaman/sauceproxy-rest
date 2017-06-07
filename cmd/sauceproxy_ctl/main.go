@@ -146,7 +146,7 @@ func main() {
 		Username: o.User,
 		Password: o.ApiKey,
 
-		Client: httpclient,
+		ExecuteRequest: httpclient.Do,
 	}
 	if len(o.Verbose) > 0 {
 		client.DecodeJSON = verboseDecodeJSON
