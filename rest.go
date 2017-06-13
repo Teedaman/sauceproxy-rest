@@ -185,9 +185,13 @@ func (c *Client) executeRequest(
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		// there could be an error here in json format
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
 		return fmt.Errorf(
-			"error querying from %s. HTTP status: %s",
+			"error querying from %s, error was: %s. HTTP status: %s",
 			req.URL,
+			buf.String(),
 			resp.Status)
 	}
 
