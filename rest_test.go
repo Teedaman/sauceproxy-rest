@@ -508,6 +508,21 @@ func TestClientCreateWaitError(t *testing.T) {
 	}
 }
 
+func TestClientErrorMessage(t *testing.T) {
+	var server = multiResponseServer([]R{
+		errorResponse(400, `{"error": "Too many active org tunnels: N+1 >= N"}`),
+	})
+	defer server.Close()
+
+	_, err := createTunnel(server.URL)
+	if err == nil {
+		t.Errorf("client.createWithTimeout didn't error")
+	}
+	if !(strings.Contains(err.Error(), "Too many active org tunnels")) {
+		t.Errorf("Invalid error: %s, did not contain json message with error.", err.Error())
+	}
+}
+
 func TestTunnelHeartBeat(t *testing.T) {
 	var server = multiResponseServer([]R{
 		stringResponse(createJSON),
