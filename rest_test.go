@@ -168,44 +168,9 @@ func TestGetLastVersionNoServer(t *testing.T) {
 	}
 }
 
-func TestClientFind(t *testing.T) {
-	const tunnelsJSON = `[
-      {
-        "status": "running",
-        "direct_domains": null,
-        "vm_version": null,
-        "last_connected": 1467691618,
-        "shutdown_time": null,
-        "ssh_port": 443,
-        "launch_time": 1467690963,
-        "user_shutdown": null,
-        "use_caching_proxy": null,
-        "creation_time": 1467690959,
-        "domain_names": [
-          "sauce-connect.proxy"
-        ],
-        "shared_tunnel": false,
-        "tunnel_identifier": null,
-        "host": "maki81134.miso.saucelabs.com",
-        "no_proxy_caching": false,
-        "owner": "henryprecheur",
-        "use_kgp": true,
-        "no_ssl_bump_domains": null,
-        "id": "fakeid",
-        "metadata": {
-          "hostname": "debian-desktop",
-          "git_version": "39e807b",
-          "platform": "Linux 4.6.0-1-amd64 #1 SMP Debian 4.6.2-2 (2016-06-25) x86_64",
-          "command": "./sc -u henryprecheur -k ****",
-          "build": "2396",
-          "release": "4.3.16",
-          "nofile_limit": 1024
-        }
-      }
-    ]`
-
+func findMatchingTunnel(jsonDoc, name string, domains []string) ([]string, error) {
 	var server = multiResponseServer([]R{
-		stringResponse(tunnelsJSON),
+		stringResponse(jsonDoc),
 	})
 	defer server.Close()
 
@@ -215,7 +180,22 @@ func TestClientFind(t *testing.T) {
 		Password: "password",
 	}
 
-	var matches, err = client.Find("fakeid", []string{"sauce-connect.proxy"})
+	return client.Find(name, domains)
+}
+
+const listTunnelJSON = `[
+  {
+	"domain_names": [
+	  "sauce-connect.proxy"
+	],
+	"tunnel_identifier": "fakename",
+	"id": "fakeid"
+  }
+]`
+
+// An unamed tunnel must match the tunnels with overlapping domain names.
+func TestClientFindUnamed(t *testing.T) {
+	var matches, err = findMatchingTunnel(listTunnelJSON, "", []string{"sauce-connect.proxy"})
 
 	if err != nil {
 		t.Errorf("client.Find errored %+v\n", err)
@@ -226,88 +206,46 @@ func TestClientFind(t *testing.T) {
 	}
 }
 
+// A named tunnel should only return tunnels with the same name, and ignore
+// the overlapping domains.
+func TestClientFindNamed(t *testing.T) {
+	var matches, err = findMatchingTunnel(
+		listTunnelJSON, "myname", []string{"sauce-connect.proxy"})
+
+	if err != nil {
+		t.Errorf("client.Find errored %+v\n", err)
+	}
+
+	// Make sure we got an empty array
+	if matches != nil {
+		t.Errorf("client.Find returned %+v\n", matches)
+	}
+}
+
 // if there are any duplicates in the array returned by Find, fail
 func TestClientFindDuplicate(t *testing.T) {
 	const tunnelsJSON = `[
       {
-        "status": "running",
-        "direct_domains": null,
-        "vm_version": null,
-        "last_connected": 1467691618,
-        "shutdown_time": null,
-        "ssh_port": 443,
-        "launch_time": 1467690963,
-        "user_shutdown": null,
-        "use_caching_proxy": null,
-        "creation_time": 1467690959,
         "domain_names": [
           "sauce-connect.proxy"
         ],
-        "shared_tunnel": false,
         "tunnel_identifier": null,
-        "host": "maki81134.miso.saucelabs.com",
-        "no_proxy_caching": false,
-        "owner": "henryprecheur",
-        "use_kgp": true,
-        "no_ssl_bump_domains": null,
-        "id": "fakeid",
-        "metadata": {
-          "hostname": "debian-desktop",
-          "git_version": "39e807b",
-          "platform": "Linux 4.6.0-1-amd64 #1 SMP Debian 4.6.2-2 (2016-06-25) x86_64",
-          "command": "./sc -u henryprecheur -k ****",
-          "build": "2396",
-          "release": "4.3.16",
-          "nofile_limit": 1024
-        }
+        "id": "fakeid"
       },
       {
-        "status": "running",
-        "direct_domains": null,
-        "vm_version": null,
-        "last_connected": 1467691618,
-        "shutdown_time": null,
-        "ssh_port": 443,
-        "launch_time": 1467690963,
-        "user_shutdown": null,
-        "use_caching_proxy": null,
-        "creation_time": 1467690959,
         "domain_names": [
           "sauce-connect.proxy",
           "test.proxy"
         ],
-        "shared_tunnel": false,
         "tunnel_identifier": null,
-        "host": "maki81134.miso.saucelabs.com",
-        "no_proxy_caching": false,
-        "owner": "henryprecheur",
-        "use_kgp": true,
-        "no_ssl_bump_domains": null,
-        "id": "test.id",
-        "metadata": {
-          "hostname": "debian-desktop",
-          "git_version": "39e807b",
-          "platform": "Linux 4.6.0-1-amd64 #1 SMP Debian 4.6.2-2 (2016-06-25) x86_64",
-          "command": "./sc -u henryprecheur -k ****",
-          "build": "2396",
-          "release": "4.3.16",
-          "nofile_limit": 1024
-        }
+        "id": "test.id"
       }
     ]`
 
-	var server = multiResponseServer([]R{
-		stringResponse(tunnelsJSON),
-	})
-	defer server.Close()
-
-	var client = Client{
-		BaseURL:  server.URL,
-		Username: "username",
-		Password: "password",
-	}
-
-	var matches, err = client.Find("fakeid", []string{"sauce-connect.proxy", "test.proxy"})
+	var matches, err = findMatchingTunnel(
+		tunnelsJSON,
+		"fakeid",
+		[]string{"sauce-connect.proxy", "test.proxy"})
 
 	if err != nil {
 		t.Errorf("client.Find errored %+v\n", err)
@@ -326,18 +264,7 @@ func TestFindBugScClient(t *testing.T) {
 		"id": "709b9c76afee3bfef42f1a9baaa5002abf6b00a9",
 		"domain_names": ["sauce-connect.proxy"]}]`
 
-	var server = multiResponseServer([]R{
-		stringResponse(tunnelsJSON),
-	})
-	defer server.Close()
-
-	var client = Client{
-		BaseURL:  server.URL,
-		Username: "username",
-		Password: "password",
-	}
-
-	var matches, err = client.Find("sauce", []string{})
+	var matches, err = findMatchingTunnel(tunnelsJSON, "sauce", []string{})
 
 	if err != nil {
 		t.Errorf("client.Find errored: %s", err)
