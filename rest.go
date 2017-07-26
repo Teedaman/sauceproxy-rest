@@ -42,8 +42,8 @@ type Client struct {
 	Password string
 
 	// Methods to override default functionality
-	DecodeJSON  func(reader io.ReadCloser, v interface{}) error
-	EncodeJSON  func(writer io.Writer, v interface{}) error
+	DecodeJSON func(reader io.ReadCloser, v interface{}) error
+	EncodeJSON func(writer io.Writer, v interface{}) error
 	// Execute the request, http.DefaultClient.Do by default
 	ExecuteRequest func(*http.Request) (*http.Response, error)
 }
@@ -247,7 +247,7 @@ func checkOverlappingDomains(localDomains []string, remoteDomains []string) bool
 
 //
 // Find tunnels: named tunnel with `name`, or tunnel matching one or more of
-// `domains`.
+// `domains` if name is empty.
 //
 func (c *Client) Find(name string, domains []string) (
 	matches []string, err error,
@@ -258,12 +258,13 @@ func (c *Client) Find(name string, domains []string) (
 	}
 
 	for _, state := range list {
-		if name != "" && state.TunnelIdentifier == name {
-			matches = append(matches, state.Id)
-			continue
-		}
-
-		if checkOverlappingDomains(domains, state.DomainNames) {
+		// If we're an unamed tunnel, check the overlapping domain names
+		if name == "" && state.TunnelIdentifier == "" {
+			if checkOverlappingDomains(domains, state.DomainNames) {
+				matches = append(matches, state.Id)
+			}
+		// If we're a named tunnel, only check the tunnels' names
+		} else if state.TunnelIdentifier == name {
 			matches = append(matches, state.Id)
 		}
 	}
