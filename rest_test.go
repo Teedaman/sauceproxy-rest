@@ -195,7 +195,9 @@ const listTunnelJSON = `[
 
 // An unamed tunnel must match the tunnels with overlapping domain names.
 func TestClientFindUnamed(t *testing.T) {
-	var matches, err = findMatchingTunnel(listTunnelJSON, "", []string{"sauce-connect.proxy"})
+	var matches, err = findMatchingTunnel(
+		`[{"domain_names": ["test1"], "tunnel_identifier": null, "id": "fakeid"}]`,
+		"", []string{"test1"})
 
 	if err != nil {
 		t.Errorf("client.Find errored %+v\n", err)
@@ -205,13 +207,29 @@ func TestClientFindUnamed(t *testing.T) {
 		t.Errorf("client.Find returned %+v\n", matches)
 	}
 
-	matches, err = findMatchingTunnel(listTunnelJSON, "", []string{"other.domain"})
+	// 2 empty names, no overlapping domain -> no match
+	matches, err = findMatchingTunnel(
+		`[{"domain_names": ["test1"], "tunnel_identifier": null, "id": "fakeid"}]`,
+		"", []string{"other.domain"})
 
 	if err != nil {
 		t.Errorf("client.Find errored %+v\n", err)
 	}
 
 	if matches != nil {
+		t.Errorf("client.Find returned %+v\n", matches)
+	}
+
+	// 2 empty names, overlapping domain -> match
+	matches, err = findMatchingTunnel(
+		`[{"domain_names": ["test1"], "tunnel_identifier": null, "id": "fakeid"}]`,
+		"", []string{"test1"})
+
+	if err != nil {
+		t.Errorf("client.Find errored %+v\n", err)
+	}
+
+	if !reflect.DeepEqual(matches, []string{"fakeid"}) {
 		t.Errorf("client.Find returned %+v\n", matches)
 	}
 }
