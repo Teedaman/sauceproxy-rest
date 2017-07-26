@@ -247,7 +247,7 @@ func checkOverlappingDomains(localDomains []string, remoteDomains []string) bool
 
 //
 // Find tunnels: named tunnel with `name`, or tunnel matching one or more of
-// `domains`.
+// `domains` if name is empty.
 //
 func (c *Client) Find(name string, domains []string) (
 	matches []string, err error,
@@ -258,12 +258,12 @@ func (c *Client) Find(name string, domains []string) (
 	}
 
 	for _, state := range list {
-		// Don't remove any other named tunnel, or a non-named tunnel if we are
-		// a named tunnel.
+		// If we're an unamed tunnel, check the overlapping domain names
 		if name == "" {
 			if checkOverlappingDomains(domains, state.DomainNames) {
 				matches = append(matches, state.Id)
 			}
+		// If we're a named tunnel, only check the tunnels' names
 		} else if state.TunnelIdentifier == name {
 			matches = append(matches, state.Id)
 		}
