@@ -259,7 +259,7 @@ func (c *Client) Find(name string, domains []string) (
 
 	for _, state := range list {
 		// If we're an unamed tunnel, check the overlapping domain names
-		if name == "" {
+		if name == "" && state.TunnelIdentifier == "" {
 			if checkOverlappingDomains(domains, state.DomainNames) {
 				matches = append(matches, state.Id)
 			}
