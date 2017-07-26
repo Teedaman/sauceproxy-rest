@@ -204,13 +204,23 @@ func TestClientFindUnamed(t *testing.T) {
 	if !reflect.DeepEqual(matches, []string{"fakeid"}) {
 		t.Errorf("client.Find returned %+v\n", matches)
 	}
+
+	matches, err = findMatchingTunnel(listTunnelJSON, "", []string{"other.domain"})
+
+	if err != nil {
+		t.Errorf("client.Find errored %+v\n", err)
+	}
+
+	if matches != nil {
+		t.Errorf("client.Find returned %+v\n", matches)
+	}
 }
 
 // A named tunnel should only return tunnels with the same name, and ignore
 // the overlapping domains.
 func TestClientFindNamed(t *testing.T) {
 	var matches, err = findMatchingTunnel(
-		listTunnelJSON, "myname", []string{"sauce-connect.proxy"})
+		listTunnelJSON, "badname", []string{"sauce-connect.proxy"})
 
 	if err != nil {
 		t.Errorf("client.Find errored %+v\n", err)
@@ -218,6 +228,18 @@ func TestClientFindNamed(t *testing.T) {
 
 	// Make sure we got an empty array
 	if matches != nil {
+		t.Errorf("client.Find returned %+v\n", matches)
+	}
+
+	// check name matching ignores domain
+	matches, err = findMatchingTunnel(
+		listTunnelJSON, "fakename", []string{"other.domain"})
+
+	if err != nil {
+		t.Errorf("client.Find errored %+v\n", err)
+	}
+
+	if !reflect.DeepEqual(matches, []string{"fakeid"}) {
 		t.Errorf("client.Find returned %+v\n", matches)
 	}
 }
