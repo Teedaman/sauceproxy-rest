@@ -263,8 +263,8 @@ func (c *Client) Find(name string, domains []string) (
 			if checkOverlappingDomains(domains, state.DomainNames) {
 				matches = append(matches, state.Id)
 			}
-		// If we're a named tunnel, only check the tunnels' names
 		} else if state.TunnelIdentifier == name {
+			// If we're a named tunnel, only check the tunnels' names
 			matches = append(matches, state.Id)
 		}
 	}
@@ -393,7 +393,7 @@ func (c *Client) CreateWithTimeout(
 
 	tunnel.Client = c
 	tunnel.Id = response.Id
-	tunnel.Host, err = tunnel.wait(timeout)
+	tunnel.Host, tunnel.IP, err = tunnel.wait(timeout)
 	// Only create channels if the tunnel succesfully come up
 	if err == nil {
 		tunnel.ServerStatus = make(chan string)
@@ -419,6 +419,7 @@ type Tunnel struct {
 	Client *Client
 	Id     string
 	Host   string
+	IP     string
 	// A channel used to communicate the state of the tunnel back to the main
 	// goroutine.
 	ServerStatus chan string
@@ -475,6 +476,7 @@ func (t *Tunnel) serverStatusLoop(interval time.Duration) {
 // Wait for the tunnel to run
 func (t *Tunnel) wait(timeout time.Duration) (
 	host string,
+	ip string,
 	err error,
 ) {
 	var end = time.Now().Add(timeout)
@@ -482,11 +484,11 @@ func (t *Tunnel) wait(timeout time.Duration) (
 	for {
 		status, err := t.Client.status(t.Id)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 
 		if status.Status == "running" {
-			return status.Host, nil
+			return status.Host, status.IP, nil
 		}
 
 		if time.Now().After(end) {
@@ -496,7 +498,7 @@ func (t *Tunnel) wait(timeout time.Duration) (
 		}
 	}
 
-	return "", fmt.Errorf(
+	return "", "", fmt.Errorf(
 		"Tunnel %s didn't come up after %s",
 		t.Id, timeout.String())
 }
@@ -513,6 +515,7 @@ type serverStatus struct {
 	Status       string `json:"status"`
 	UserShutdown *bool  `json:"user_shutdown"`
 	Host         string `json:"host"`
+	IP           string `json:"ip_address"`
 }
 
 func (c *Client) status(id string) (status serverStatus, err error) {
