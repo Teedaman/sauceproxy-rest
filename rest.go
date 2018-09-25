@@ -382,6 +382,7 @@ func (c *Client) CreateWithTimeout(
 	}
 	var response struct {
 		Id   string `json:"id"`
+		Ip           string `json:"ip_address"`
 		Host string `json:"host"`
 	}
 	var url = fmt.Sprintf("%s/%s/tunnels", c.BaseURL, c.Username)
@@ -393,7 +394,7 @@ func (c *Client) CreateWithTimeout(
 
 	tunnel.Client = c
 	tunnel.Id = response.Id
-	tunnel.Host, err = tunnel.wait(timeout)
+	tunnel.Host, tunnel.Ip, err = tunnel.wait(timeout)
 	// Only create channels if the tunnel succesfully come up
 	if err == nil {
 		tunnel.ServerStatus = make(chan string)
@@ -419,6 +420,7 @@ type Tunnel struct {
 	Client *Client
 	Id     string
 	Host   string
+	Ip     string
 	// A channel used to communicate the state of the tunnel back to the main
 	// goroutine.
 	ServerStatus chan string
@@ -475,6 +477,7 @@ func (t *Tunnel) serverStatusLoop(interval time.Duration) {
 // Wait for the tunnel to run
 func (t *Tunnel) wait(timeout time.Duration) (
 	host string,
+	ip string,
 	err error,
 ) {
 	var end = time.Now().Add(timeout)
@@ -482,11 +485,11 @@ func (t *Tunnel) wait(timeout time.Duration) (
 	for {
 		status, err := t.Client.status(t.Id)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 
 		if status.Status == "running" {
-			return status.Host, nil
+			return status.Host, status.Ip, nil
 		}
 
 		if time.Now().After(end) {
@@ -496,7 +499,7 @@ func (t *Tunnel) wait(timeout time.Duration) (
 		}
 	}
 
-	return "", fmt.Errorf(
+	return "", "", fmt.Errorf(
 		"Tunnel %s didn't come up after %s",
 		t.Id, timeout.String())
 }
@@ -512,6 +515,7 @@ func (t *Tunnel) ShutdownWaitForJobs() (int, error) {
 type serverStatus struct {
 	Status       string `json:"status"`
 	UserShutdown *bool  `json:"user_shutdown"`
+	Ip           string `json:"ip_address"`
 	Host         string `json:"host"`
 }
 
