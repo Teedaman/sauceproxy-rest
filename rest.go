@@ -263,8 +263,8 @@ func (c *Client) Find(name string, domains []string) (
 			if checkOverlappingDomains(domains, state.DomainNames) {
 				matches = append(matches, state.Id)
 			}
-		// If we're a named tunnel, only check the tunnels' names
 		} else if state.TunnelIdentifier == name {
+			// If we're a named tunnel, only check the tunnels' names
 			matches = append(matches, state.Id)
 		}
 	}
@@ -382,7 +382,7 @@ func (c *Client) CreateWithTimeout(
 	}
 	var response struct {
 		Id   string `json:"id"`
-		Ip           string `json:"ip_address"`
+		Ip   string `json:"ip_address"`
 		Host string `json:"host"`
 	}
 	var url = fmt.Sprintf("%s/%s/tunnels", c.BaseURL, c.Username)
@@ -520,6 +520,7 @@ type serverStatus struct {
 }
 
 func (c *Client) status(id string) (status serverStatus, err error) {
+	status = serverStatus{Ip: ""}
 	var url = fmt.Sprintf("%s/%s/tunnels/%s", c.BaseURL, c.Username, id)
 
 	err = c.executeRequest("GET", url, nil, &status)
