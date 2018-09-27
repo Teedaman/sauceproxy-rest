@@ -81,6 +81,8 @@ func multiResponseServer(responses []R) *httptest.Server {
 			if index < len(responses) {
 				responses[index](w, r)
 				index += 1
+			} else {
+				responses[len(responses)-1](w, r)
 			}
 		}))
 }
@@ -379,7 +381,8 @@ func TestClientShutdown404(t *testing.T) {
 	}
 }
 
-const createJSON = `{
+const (
+	createJSON = `{
   "status": "new",
   "direct_domains": null,
   "vm_version": null,
@@ -397,12 +400,12 @@ const createJSON = `{
   "tunnel_identifier": null,
   "host": null,
   "no_proxy_caching": false,
-  "owner": "henryprecheur",
+  "owner": "zwane",
   "use_kgp": true,
   "no_ssl_bump_domains": null,
   "id": "49958ce5ec9f49c796542e0c691455a6",
   "metadata": {
-    "hostname": "Henry's computer",
+    "hostname": "Commodore64 Limited Edition",
     "git_version": "4a804fd",
     "platform": "plan9",
     "command": "./sc",
@@ -412,7 +415,11 @@ const createJSON = `{
   }
 }`
 
-const statusRunningJSON = `{"status": "running", "user_shutdown": null}`
+	statusRunningJSON       = `{"status": "running", "user_shutdown": null, "host": "HOSTNAME", "ip_address": "1.2.3.4"}`
+	statusRunningNoIpJSON   = `{"status": "running", "user_shutdown": null, "host": "HOSTNAME"}`
+	statusRunningNullIpJSON = `{"status": "running", "user_shutdown": null, "host": "HOSTNAME", "ip_address": null}`
+	statusShutdownJSON      = `{"status": "shutdown", "user_shutdown": null, "host": "HOSTNAME"}`
+)
 
 func createTunnel(url string) (Tunnel, error) {
 	var client = Client{
@@ -423,13 +430,41 @@ func createTunnel(url string) (Tunnel, error) {
 	var request = Request{
 		DomainNames: []string{"sauce-connect.proxy"},
 	}
-	return client.CreateWithTimeout(&request, 0)
+	return client.CreateWithTimeout(&request, 1*time.Second)
 }
 
 func TestClientCreate(t *testing.T) {
 	var server = multiResponseServer([]R{
 		stringResponse(createJSON),
 		stringResponse(statusRunningJSON),
+	})
+	defer server.Close()
+
+	_, err := createTunnel(server.URL)
+	if err != nil {
+		t.Errorf("client.createWithTimeout errored %+v\n", err)
+	}
+}
+
+func TestClientCreateNoIpReceived(t *testing.T) {
+	// In case REST implementation doesn't return ip_address yet
+	var server = multiResponseServer([]R{
+		stringResponse(createJSON),
+		stringResponse(statusRunningNoIpJSON),
+	})
+	defer server.Close()
+
+	_, err := createTunnel(server.URL)
+	if err != nil {
+		t.Errorf("client.createWithTimeout errored %+v\n", err)
+	}
+}
+
+func TestClientCreateNullIpReceived(t *testing.T) {
+	// In case tunnel was started before we started adding ip_address to DB
+	var server = multiResponseServer([]R{
+		stringResponse(createJSON),
+		stringResponse(statusRunningNullIpJSON),
 	})
 	defer server.Close()
 
@@ -466,12 +501,11 @@ func TestClientCreateWaitError(t *testing.T) {
 	_, err := createTunnel(server.URL)
 	if err == nil {
 		t.Errorf("client.createWithTimeout didn't error")
-	}
-	// go 1.7 adds an s after the # of seconds, previous versions don't have the s
-	if !(strings.HasPrefix(err.Error(), "Tunnel ") &&
-		(strings.HasSuffix(err.Error(), " didn't come up after 0s")) ||
-		strings.HasSuffix(err.Error(), " didn't come up after 0")) {
-		t.Errorf("Invalid error: %s", err.Error())
+	} else {
+		if !(strings.HasPrefix(err.Error(), "Tunnel ") &&
+			strings.HasSuffix(err.Error(), " didn't come up after 1s")) {
+			t.Errorf("Invalid error: %s", err.Error())
+		}
 	}
 }
 
@@ -536,7 +570,7 @@ func TestTunnelLoop(t *testing.T) {
 	var server = multiResponseServer([]R{
 		stringResponse(createJSON),
 		stringResponse(statusRunningJSON),
-		stringResponse(`{"status": "shutdown", "user_shutdown": null}`),
+		stringResponse(statusShutdownJSON),
 	})
 
 	tunnel, err := createTunnel(server.URL)
