@@ -97,7 +97,7 @@ func TestGetLastVersion(t *testing.T) {
 	var client = Client{
 		BaseURL: server.URL,
 	}
-	build, url, err := client.GetLastVersion(server.URL)
+	build, url, err := client.GetLastVersionFromURL(server.URL)
 
 	if err != nil {
 		t.Errorf("%v", err)
@@ -119,7 +119,7 @@ func TestGetLastVersionBadJSON(t *testing.T) {
 	var client = Client{
 		BaseURL: server.URL,
 	}
-	_, _, err := client.GetLastVersion(server.URL)
+	_, _, err := client.GetLastVersionFromURL(server.URL)
 
 	if err == nil {
 		t.Error("GetLastVersion == nil")
@@ -139,7 +139,7 @@ func TestGetLastVersion404(t *testing.T) {
 	var client = Client{
 		BaseURL: server.URL,
 	}
-	_, _, err := client.GetLastVersion(server.URL)
+	_, _, err := client.GetLastVersionFromURL(server.URL)
 
 	if err == nil {
 		t.Error("GetLastVersion == nil")
@@ -159,7 +159,7 @@ func TestGetLastVersionNoServer(t *testing.T) {
 	var client = Client{
 		BaseURL: server.URL,
 	}
-	_, _, err := client.GetLastVersion(server.URL)
+	_, _, err := client.GetLastVersionFromURL(server.URL)
 
 	if err == nil {
 		t.Error("GetLastVersion == nil")

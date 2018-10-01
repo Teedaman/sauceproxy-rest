@@ -56,12 +56,16 @@ type Client struct {
 // Return the newest build number for the platform as determined by
 // runtime.GOOS, and the URL to download the latest verion.
 //
-func (c *Client) GetLastVersion(versionUrl string) (
+
+func (c *Client) GetLastVersion() (
 	build int, downloadUrl string, err error,
 ) {
-	if versionUrl == "" {
-		versionUrl = SauceLabsURL
-	}
+	return c.GetLastVersionFromURL(SauceLabsURL)
+}
+
+func (c *Client) GetLastVersionFromURL(versionUrl string) (
+	build int, downloadUrl string, err error,
+) {
 	u, err := url.Parse(versionUrl)
 	u.Path = ""
 	var fullUrl = fmt.Sprintf("%s/versions.json", u)

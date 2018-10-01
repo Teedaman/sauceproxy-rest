@@ -154,7 +154,7 @@ func main() {
 	}
 	switch command {
 	case "checkversion":
-		build, u, err := client.GetLastVersion("")
+		build, u, err := client.GetLastVersion()
 		if err == nil {
 			fmt.Printf("%d %s\n", build, u)
 		} else {
