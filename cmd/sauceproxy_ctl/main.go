@@ -37,7 +37,7 @@ type CreateOptions struct {
 	SharedTunnel     bool          `short:"s" long:"shared-tunnel" description:"Let sub-accounts of the tunnel owner use the tunnel if requested."`
 	VmVersion        string        `long:"vm-version" value-name:"<version>" description:"Request a specific tunnel VM version."`
 	NoSslBumpDomains []string      `short:"B" long:"no-ssl-bump-domains" value-name:"<...>" description:"Comma-separated list of domains. Requests whose host matches one of these will not be SSL re-encrypted."`
-	ExtraInfo		 string        `long:"extra-info" description:"JSON document to with extra feature flags"`
+	ExtraInfo        string        `long:"extra-info" description:"JSON document to with extra feature flags"`
 	Timeout          time.Duration `long:"timeout" description:"Timeout (example: 10, 10s 1m, or 1h)"`
 }
 
@@ -92,12 +92,12 @@ type Options struct {
 			Id string `description:"Tunnel ID (not tunnel identifier)"`
 		} `positional-args:"yes" required:"yes"`
 	} `command:"status"`
-	Find TunnelOptions `command:"find"`
-	List struct{}      `command:"list"`
-	Ping PingOptions   `command:"ping"`
+	Find      TunnelOptions `command:"find"`
+	List      struct{}      `command:"list"`
+	Ping      PingOptions   `command:"ping"`
 	Keepalive struct {
 		PingOptions
-		Period	time.Duration `short:"p" description:"period between keepalive" default:"30s"`
+		Period time.Duration `short:"p" description:"period between keepalive" default:"30s"`
 	} `command:"keepalive"`
 	KgpHost struct {
 		Arg struct {
@@ -154,7 +154,7 @@ func main() {
 	}
 	switch command {
 	case "checkversion":
-		build, u, err := client.GetLastVersion()
+		build, u, err := client.GetLastVersion("")
 		if err == nil {
 			fmt.Printf("%d %s\n", build, u)
 		} else {
@@ -184,7 +184,7 @@ func main() {
 				SharedTunnel:     options.SharedTunnel,
 				VMVersion:        options.VmVersion,
 				NoSSLBumpDomains: options.NoSslBumpDomains,
-				ExtraInfo:		  options.ExtraInfo,
+				ExtraInfo:        options.ExtraInfo,
 				Metadata:         metadata,
 			},
 			timeout,
@@ -248,10 +248,10 @@ func main() {
 		}
 	case "kgp_host":
 		var id = o.KgpHost.Arg.Id
-		if host, err := client.KgpHost(id); err != nil {
+		if host, hostIp, err := client.KgpHost(id); err != nil {
 			log.Fatalln(err)
 		} else {
-			fmt.Println(host)
+			fmt.Printf("KGP server hostname: %s, ip address: %s", host, hostIp)
 		}
 	default:
 		logger.Fatalln("unknown command:", command)
