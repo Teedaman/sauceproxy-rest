@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const SauceLabsURL = "https://saucelabs.com"
+
 //
 // Decode `reader` into the object `v`, and close `reader` after.
 //
@@ -54,11 +56,17 @@ type Client struct {
 // Return the newest build number for the platform as determined by
 // runtime.GOOS, and the URL to download the latest verion.
 //
+
 func (c *Client) GetLastVersion() (
 	build int, downloadUrl string, err error,
 ) {
-	// We use only the hostname part of base url
-	u, err := url.Parse(c.BaseURL)
+	return c.GetLastVersionFromURL(SauceLabsURL)
+}
+
+func (c *Client) GetLastVersionFromURL(versionUrl string) (
+	build int, downloadUrl string, err error,
+) {
+	u, err := url.Parse(versionUrl)
 	u.Path = ""
 	var fullUrl = fmt.Sprintf("%s/versions.json", u)
 
@@ -551,13 +559,13 @@ func (c *Client) Status(id string) (
 	return
 }
 
-func (c *Client) KgpHost(id string) (string, error) {
+func (c *Client) KgpHost(id string) (string, string, error) {
 	var s, err = c.status(id)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return s.Host, nil
+	return s.Host, s.Ip, nil
 }
 
 func (t *Tunnel) Status() (
